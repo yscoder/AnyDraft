@@ -1,37 +1,44 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   Eraser,
-  FileText,
+  File,
   FilePlus,
+  FileText,
   FolderOpen,
-  Image,
+  FolderPlus,
+  Image as ImageIcon,
   Pencil,
+  RefreshCw,
   Trash2,
 } from 'lucide-react';
-import type { Draft } from '@any-draft/shared';
-import {Button} from './ui/button'
+import type { RepoNode } from '@any-draft/shared';
+import { Button } from './ui/button';
 import { TooltipHint } from '@/components/ui/tooltip';
 
-interface Props {
-  drafts: Draft[];
-  activeId: string;
-  onSelect: (id: string) => void;
-  onNew: () => void;
-  onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
-  /** 本地图片库：文件名 → data URI */
-  images: Record<string, string>;
-  /** 被任意草稿以 ![[name]] 引用到的图片名 */
-  usedImageNames: Set<string>;
-  onDeleteImage: (name: string) => void;
-  onCleanupImages: () => void;
-  /** 点击图片：定位到正文里引用它的位置 */
-  onLocateImage: (name: string) => void;
+/** 目录树的递归分支 */
+export interface TreeBranch {
+  node: RepoNode;
+  children: TreeBranch[];
 }
 
-/** 相对时间：列表里比绝对时间戳更好读 */
+interface Props {
+  rootName: string;
+  tree: TreeBranch[];
+  activePath: string;
+  markdownCount: number;
+  unusedImageCount: number;
+  onSelect: (path: string) => void;
+  onCreateMarkdown: (dirPath: string) => void;
+  onCreateDirectory: (dirPath: string) => void;
+  onRename: (path: string, newName: string) => void;
+  onDelete: (path: string) => void;
+  onRefresh: () => void;
+  onLocateImage: (name: string) => void;
+  onCleanupImages: () => void;
+}
+
 function relativeTime(ts: number, now: number): string {
   const diff = Math.max(0, now - ts);
   const min = Math.floor(diff / 60000);
@@ -45,205 +52,244 @@ function relativeTime(ts: number, now: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-/** data URI 的实际字节数（base64 每 4 字符表示 3 字节） */
-function dataUrlBytes(dataUrl: string): number {
-  const i = dataUrl.indexOf(',');
-  const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
-  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
-  return Math.max(0, Math.floor((b64.length * 3) / 4) - padding);
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** 文件图标按节点种类映射 */
+function nodeIcon(kind: RepoNode['kind']) {
+  if (kind === 'markdown') return <FileText size={14} />;
+  if (kind === 'image') return <ImageIcon size={14} />;
+  return <File size={14} />;
+}
+
 /**
- * 文件树面板：常驻管理草稿与本地图片库。
- * 图片存在 IndexedDB 里，不清理会一直堆积，所以这里要能看见占用并删除。
+ * 文件树：真实目录结构。
+ * 树里只允许新建 md 文件与文件夹；图片与其它文件灰显只读。
  */
 export default function FileTree({
-  drafts,
-  activeId,
+  rootName,
+  tree,
+  activePath,
+  markdownCount,
+  unusedImageCount,
   onSelect,
-  onNew,
+  onCreateMarkdown,
+  onCreateDirectory,
   onRename,
   onDelete,
-  images,
-  usedImageNames,
-  onDeleteImage,
-  onCleanupImages,
+  onRefresh,
   onLocateImage,
+  onCleanupImages,
 }: Props) {
-  const [draftsOpen, setDraftsOpen] = useState(true);
-  const [imagesOpen, setImagesOpen] = useState(false);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['']));
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
-  /** 时间戳只在挂载时取一次，避免每次渲染都读时钟 */
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
-    if (renamingId) renameInputRef.current?.select();
-  }, [renamingId]);
+    if (renamingPath) renameInputRef.current?.select();
+  }, [renamingPath]);
 
-  const imageList = useMemo(
-    () =>
-      Object.entries(images)
-        .map(([name, dataUrl]) => ({ name, bytes: dataUrlBytes(dataUrl), used: usedImageNames.has(name) }))
-        .sort((a, b) => b.bytes - a.bytes),
-    [images, usedImageNames],
-  );
-  const totalBytes = imageList.reduce((sum, i) => sum + i.bytes, 0);
-  const unusedCount = imageList.filter((i) => !i.used).length;
+  const toggle = (path: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
 
   const submitRename = () => {
-    if (renamingId && renameValue.trim()) onRename(renamingId, renameValue);
-    setRenamingId(null);
+    if (renamingPath && renameValue.trim()) onRename(renamingPath, renameValue);
+    setRenamingPath(null);
     setRenameValue('');
+  };
+
+  const renameInput = (path: string) => (
+    <div key={path} className="tree-file renaming">
+      {nodeIcon('markdown')}
+      <input
+        ref={renameInputRef}
+        className="tree-rename-input"
+        value={renameValue}
+        onChange={(e) => setRenameValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submitRename();
+          if (e.key === 'Escape') setRenamingPath(null);
+        }}
+        onBlur={submitRename}
+      />
+    </div>
+  );
+
+  const renderNode = (branch: TreeBranch) => {
+    const { node, children } = branch;
+    const isDir = node.kind === 'dir';
+    const isMd = node.kind === 'markdown';
+    const isImage = node.kind === 'image';
+    const isActive = node.path === activePath;
+    const open = expanded.has(node.path);
+
+    if (renamingPath === node.path) return renameInput(node.path);
+
+    // 目录行：点击展开/收起，hover 显示「新建 md / 新建文件夹 / 重命名 / 删除」
+    if (isDir) {
+      return (
+        <div key={node.path}>
+          <div className="tree-file dir">
+            <button className="tree-folder-main" onClick={() => toggle(node.path)}>
+              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              <FolderOpen size={14} />
+              <span className="tree-folder-name">{node.name}</span>
+              {node.path === '' && <span className="tree-count">{markdownCount}</span>}
+            </button>
+            <span className="tree-file-actions">
+              <TooltipHint content="新建文档">
+                <button aria-label="新建文档" onClick={() => onCreateMarkdown(node.path)}>
+                  <FilePlus size={12} />
+                </button>
+              </TooltipHint>
+              <TooltipHint content="新建文件夹">
+                <button aria-label="新建文件夹" onClick={() => onCreateDirectory(node.path)}>
+                  <FolderPlus size={12} />
+                </button>
+              </TooltipHint>
+              {node.path !== '' && (
+                <>
+                  <TooltipHint content="重命名">
+                    <button
+                      aria-label={`重命名 ${node.name}`}
+                      onClick={() => {
+                        setRenamingPath(node.path);
+                        setRenameValue(node.name);
+                      }}
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </TooltipHint>
+                  <TooltipHint content="删除">
+                    <button aria-label={`删除 ${node.name}`} onClick={() => onDelete(node.path)}>
+                      <Trash2 size={12} />
+                    </button>
+                  </TooltipHint>
+                </>
+              )}
+            </span>
+          </div>
+          {open && (
+            <div className="tree-children" role="group">
+              {children.length === 0 ? (
+                <p className="tree-empty">空文件夹</p>
+              ) : (
+                children.map(renderNode)
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 文件行：md 可编辑，图片与其它文件灰显只读
+    const readonly = !isMd;
+    const className = `tree-file ${isActive ? 'active' : ''} ${readonly ? 'readonly' : ''} ${isImage ? 'image' : ''}`;
+    const meta = isImage
+      ? `${formatBytes(node.size ?? 0)}`
+      : isMd
+        ? relativeTime(node.updatedAt ?? now, now)
+        : '';
+    return (
+      <div key={node.path} className={className} role="treeitem" aria-selected={isActive}>
+        <button
+          className="tree-file-main"
+          onClick={() => {
+            if (isImage) onLocateImage(node.name);
+            else if (isMd) onSelect(node.path);
+          }}
+          style={readonly && !isImage ? { cursor: 'default' } : undefined}
+        >
+          {nodeIcon(node.kind)}
+          <span className="tree-file-text">
+            <span className="tree-file-name">{node.name}</span>
+            {meta && <span className="tree-file-meta">{meta}</span>}
+          </span>
+        </button>
+        {isMd && (
+          <span className="tree-file-actions">
+            <TooltipHint content="重命名">
+              <button
+                aria-label={`重命名 ${node.name}`}
+                onClick={() => {
+                  setRenamingPath(node.path);
+                  setRenameValue(node.name);
+                }}
+              >
+                <Pencil size={12} />
+              </button>
+            </TooltipHint>
+            <TooltipHint content="删除">
+              <button aria-label={`删除 ${node.name}`} onClick={() => onDelete(node.path)}>
+                <Trash2 size={12} />
+              </button>
+            </TooltipHint>
+          </span>
+        )}
+      </div>
+    );
   };
 
   return (
     <nav className="file-tree" aria-label="文件">
       <div className="tree-head">
         <span className="tree-head-label font-semibold">文件</span>
-        <TooltipHint content="新建草稿">
-          <Button variant="ghost" size="icon-sm" className='rounded-sm!' aria-label="新建草稿" onClick={onNew}>
-            <FilePlus />
+        <TooltipHint content="刷新目录">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="rounded-sm!"
+            aria-label="刷新目录"
+            onClick={onRefresh}
+          >
+            <RefreshCw />
           </Button>
         </TooltipHint>
       </div>
 
       <div className="tree-body" role="tree" aria-label="文件">
-        {/* ---- 草稿 ---- */}
-        <div className="tree-group" role="treeitem" aria-expanded={draftsOpen}>
-          <button className="tree-folder" onClick={() => setDraftsOpen((v) => !v)}>
-            {draftsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        {/* 根目录行：工作目录本身，展开后即顶层内容 */}
+        <div className="tree-file dir">
+          <button className="tree-folder-main" onClick={() => toggle('')}>
+            {expanded.has('') ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             <FolderOpen size={14} />
-            <span className="tree-folder-name">草稿</span>
-            <span className="tree-count">{drafts.length}</span>
+            <span className="tree-folder-name">{rootName}</span>
+            <span className="tree-count">{markdownCount}</span>
           </button>
-
-          {draftsOpen && (
-            <div className="tree-children" role="group">
-              {drafts.map((d) => {
-                const active = d.id === activeId;
-                if (renamingId === d.id) {
-                  return (
-                    <div key={d.id} className="tree-file renaming">
-                      <FileText size={14} />
-                      <input
-                        ref={renameInputRef}
-                        className="tree-rename-input"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') submitRename();
-                          if (e.key === 'Escape') setRenamingId(null);
-                        }}
-                        onBlur={submitRename}
-                      />
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    key={d.id}
-                    className={`tree-file ${active ? 'active' : ''}`}
-                    role="treeitem"
-                    aria-selected={active}
-                  >
-                    <button className="tree-file-main" onClick={() => onSelect(d.id)}>
-                      <FileText size={14} />
-                      <span className="tree-file-text">
-                        <span className="tree-file-name">{d.name}</span>
-                        <span className="tree-file-meta">
-                          {d.content.replace(/\s/g, '').length} 字 · {relativeTime(d.updatedAt, now)}
-                        </span>
-                      </span>
-                    </button>
-                    <span className="tree-file-actions">
-                      <TooltipHint content="重命名">
-                        <button
-                          aria-label={`重命名 ${d.name}`}
-                          onClick={() => {
-                            setRenamingId(d.id);
-                            setRenameValue(d.name);
-                          }}
-                        >
-                          <Pencil size={12} />
-                        </button>
-                      </TooltipHint>
-                      <TooltipHint content="删除">
-                        <button aria-label={`删除 ${d.name}`} onClick={() => onDelete(d.id)}>
-                          <Trash2 size={12} />
-                        </button>
-                      </TooltipHint>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <span className="tree-file-actions">
+            <TooltipHint content="新建文档">
+              <button aria-label="新建文档" onClick={() => onCreateMarkdown('')}>
+                <FilePlus size={12} />
+              </button>
+            </TooltipHint>
+            <TooltipHint content="新建文件夹">
+              <button aria-label="新建文件夹" onClick={() => onCreateDirectory('')}>
+                <FolderPlus size={12} />
+              </button>
+            </TooltipHint>
+          </span>
         </div>
-
-        {/* ---- 图片库 ---- */}
-        <div className="tree-group" role="treeitem" aria-expanded={imagesOpen}>
-          <button className="tree-folder" onClick={() => setImagesOpen((v) => !v)}>
-            {imagesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-            <Image size={14} />
-            <span className="tree-folder-name">图片</span>
-            {totalBytes > 0 && <span className="tree-size">{formatBytes(totalBytes)}</span>}
-            <span className="tree-count">{imageList.length}</span>
+        {expanded.has('') && (
+          <div className="tree-children" role="group">
+            {tree.length === 0 ? <p className="tree-empty">点击上方 + 新建第一篇文档</p> : tree.map(renderNode)}
+          </div>
+        )}
+        {unusedImageCount > 0 && (
+          <button className="tree-cleanup" onClick={onCleanupImages}>
+            <Eraser size={13} />
+            清理 {unusedImageCount} 张未引用图片
           </button>
-
-          {imagesOpen && (
-            <div className="tree-children" role="group">
-              {imageList.length === 0 ? (
-                <p className="tree-empty">把图片拖进编辑器即可加入</p>
-              ) : (
-                <>
-                  {imageList.map((img) => (
-                    <div key={img.name} className={`tree-file ${img.used ? '' : 'unused'}`} role="treeitem">
-                      <TooltipHint
-                        content={img.used ? `${img.name} — 点击定位到正文` : `${img.name} — 未被任何草稿引用`}
-                        side="right"
-                      >
-                        <button className="tree-file-main" onClick={() => onLocateImage(img.name)}>
-                          <Image size={14} />
-                          <span className="tree-file-text">
-                            <span className="tree-file-name">{img.name}</span>
-                            <span className="tree-file-meta">
-                              {formatBytes(img.bytes)}
-                              {img.used ? '' : ' · 未引用'}
-                            </span>
-                          </span>
-                        </button>
-                      </TooltipHint>
-                      <span className="tree-file-actions">
-                        <TooltipHint content="删除图片">
-                          <button
-                            aria-label={`删除图片 ${img.name}`}
-                            onClick={() => onDeleteImage(img.name)}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </TooltipHint>
-                      </span>
-                    </div>
-                  ))}
-                  {unusedCount > 0 && (
-                    <button className="tree-cleanup" onClick={onCleanupImages}>
-                      <Eraser size={13} />
-                      清理 {unusedCount} 张未引用
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </nav>
   );

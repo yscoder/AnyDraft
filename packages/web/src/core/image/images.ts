@@ -34,25 +34,12 @@ export function downscaleImage(file: File, maxDim = 1280, quality = 0.82): Promi
   });
 }
 
-/**
- * 批量注册图片文件：逐张降采样后调用 onAdd(name, dataUrl)。
- * 返回成功/失败的文件名，便于插入 ![[name]] 或提示。
- */
-export async function registerImageFiles(
-  files: File[],
-  onAdd: (name: string, dataUrl: string) => void,
-): Promise<{ names: string[]; failures: string[] }> {
-  const names: string[] = [];
-  const failures: string[] = [];
-  for (const f of files) {
-    try {
-      const dataUrl = await downscaleImage(f);
-      onAdd(f.name, dataUrl);
-      names.push(f.name);
-    } catch (err) {
-      console.warn('图片处理失败', f.name, err);
-      failures.push(f.name);
-    }
-  }
-  return { names, failures };
+/** Blob → data URL（复制富文本 / 导出时内嵌 HTML 用） */
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('读取图片失败'));
+    reader.readAsDataURL(blob);
+  });
 }

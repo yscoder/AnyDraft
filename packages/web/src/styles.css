@@ -673,6 +673,143 @@ button {
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring) 35%, transparent);
 }
 
+/* 目录行：与文件行共用 .tree-file 容器，主区为展开/收起按钮 */
+.tree-folder-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  padding: 6px 6px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.tree-folder-main:hover {
+  background: rgba(60, 54, 44, 0.05);
+}
+
+.tree-folder-main svg {
+  flex: none;
+  opacity: 0.7;
+}
+
+.tree-folder-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+/* 非 Markdown 文件（图片及其它）：灰显只读 */
+.tree-file.readonly .tree-file-name {
+  color: var(--muted-foreground);
+}
+
+.tree-file.readonly .tree-file-main svg {
+  opacity: 0.35;
+}
+
+.tree-file.readonly .tree-file-main {
+  cursor: default;
+}
+
+.tree-file.readonly.image .tree-file-main {
+  cursor: pointer;
+}
+
+.tree-file.readonly.image .tree-file-meta {
+  color: var(--faint);
+}
+
+/* ---------------- 工作目录选择 / 授权 ---------------- */
+.welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, color-mix(in oklch, var(--accent) 9%, transparent), transparent),
+    var(--background);
+}
+
+.welcome-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 30px 28px 24px;
+  background: var(--panel-solid, #fffdf9);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -30px rgba(60, 54, 44, 0.25);
+}
+
+.welcome-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.welcome-card h1 {
+  margin: 4px 0 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  color: var(--ink);
+}
+
+.welcome-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+
+.welcome-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.welcome-secondary {
+  align-self: center;
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.welcome-secondary:hover {
+  color: var(--accent-strong);
+}
+
+.welcome-foot {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--faint);
+}
+
 .tree-file.renaming > svg {
   flex: none;
   opacity: 0.55;

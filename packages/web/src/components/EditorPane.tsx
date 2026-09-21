@@ -25,7 +25,6 @@ import { autocompletion } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { TooltipHint } from '@/components/ui/tooltip';
-import { registerImageFiles } from '@/core/image/images';
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
 
 /* Lucide 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
@@ -35,12 +34,12 @@ const HEADING_ICON = { 1: Heading1, 2: Heading2, 3: Heading3, 4: Heading4 } as c
 interface Props {
   value: string;
   onChange: (v: string) => void;
-  /** 注册本地图片：文件名 → data URI（供 ![[name]] 渲染） */
-  onAddImage: (name: string, dataUrl: string) => void;
+  /** 保存一张图片到当前文档同级目录，返回最终文件名（失败返回 null） */
+  onAddImage: (file: File) => Promise<string | null>;
   /** 已导入图片名列表（![[ 自动补全用） */
   imageNames: string[];
-  /** 当前草稿 id：切换草稿时强制同步 doc */
-  draftId: string;
+  /** 当前文档路径：切换文档时强制同步 doc */
+  fileKey: string;
   /** 滚动同步通道：把编辑器顶部对应的源码位置发布给预览 */
   sync: ScrollSyncChannel;
   /** 预览模式：面板收起 */
@@ -55,7 +54,7 @@ interface Props {
 }
 
 const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
-  { value, onChange, onAddImage, imageNames, draftId, sync, collapsed, outlineOpen, jumpRequest },
+  { value, onChange, onAddImage, imageNames, fileKey, sync, collapsed, outlineOpen, jumpRequest },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -69,10 +68,22 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   imageNamesRef.current = imageNames;
   /** 编辑器最近一次上报给父组件的文本（用来区分「自己改的」和「外部改的」） */
   const lastEmittedRef = useRef(value);
-  /** 注册图片，并在当前光标处插入 Obsidian 嵌入 ![[name]] */
+  /** onAddImage 走 ref：CodeMirror 监听只在挂载时注册，闭包会停在首个文档 */
+  const onAddImageRef = useRef(onAddImage);
+  onAddImageRef.current = onAddImage;
+  /** 逐张保存图片，成功后回填 ![[name]] 到光标处 */
   const insertImages = async (files: File[]) => {
     const view = viewRef.current;
-    const { names } = await registerImageFiles(files, onAddImage);
+    if (!view) return;
+    const names: string[] = [];
+    for (const file of files) {
+      try {
+        const name = await onAddImageRef.current(file);
+        if (name) names.push(name);
+      } catch {
+        // 单张失败不阻断其它图片
+      }
+    }
     if (!names.length || !view) return;
     const block = names.map((n) => `![[${n}]]\n`).join('');
     view.dispatch({
@@ -210,7 +221,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 内容同步：草稿切换（draftId 变化）或外部 value 变化（导入/清理）时，
+  // 内容同步：文档切换（fileKey 变化）或外部 value 变化（导入/刷新）时，
   // 若 doc 与 value 不同则全量替换并尽量保持光标。
   // 编辑/撤销产生的变化经 updateListener 已即时写回 value（cur === value），
   // 不会触发这里的同步，因此不影响输入与撤销。
@@ -232,7 +243,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       selection: { anchor: Math.min(anchor, value.length), head: Math.min(head, value.length) },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId, value]);
+  }, [fileKey, value]);
 
   // 外部跳转：定位到指定行并居中。
   // 声明顺序在内容同步之后 —— 跨草稿跳转时新文档已经就位，行号才对得上。

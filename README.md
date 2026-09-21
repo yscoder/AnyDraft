@@ -7,9 +7,9 @@
 ```text
 packages/
 ├── shared/    @any-draft/shared  跨运行时纯逻辑：领域类型（Draft）与 ZIP 编解码；
-│                                 未来承载 ContentRepository 接口与契约测试
+│                                 以及 ContentRepository 接口（平台适配层）
 ├── web/       @any-draft/web    Web 应用：全部 UI、编辑器、渲染与浏览器存储
-│                                 （localStorage / IndexedDB）
+│                                 （File System Access API，直接读写真实目录）
 └── desktop/   @any-draft/desktop 桌面端 Tauri 壳（规划中、暂未实现，
                                    见 docs/TAURI_DESKTOP_MIGRATION_PLAN.md）
 ```
