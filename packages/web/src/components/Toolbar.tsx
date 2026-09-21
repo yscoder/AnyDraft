@@ -42,7 +42,7 @@ export default function Toolbar({
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="workspace-actions">
+    <div className="flex items-center gap-2 justify-self-end min-w-0 max-[700px]:gap-1">
       {/* 导入：.md 各建一篇草稿，.zip 按备份包整体还原 */}
       <input
         ref={fileRef}
@@ -64,7 +64,7 @@ export default function Toolbar({
           onClick={() => fileRef.current?.click()}
         >
           <Upload data-icon="inline-start" />
-          <span className="action-label">导入</span>
+          <span className="max-[700px]:hidden">导入</span>
         </Button>
       </TooltipHint>
 
@@ -72,8 +72,8 @@ export default function Toolbar({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" disabled={exporting} aria-label={exporting ? '导出中' : '导出'}>
             <Download data-icon="inline-start" />
-            <span className="action-label">{exporting ? '导出中…' : '导出'}</span>
-            <ChevronDown className="action-menu-icon" data-icon="inline-end" />
+            <span className="max-[700px]:hidden">{exporting ? '导出中…' : '导出'}</span>
+            <ChevronDown className="max-[700px]:hidden" data-icon="inline-end" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-52">
@@ -96,7 +96,7 @@ export default function Toolbar({
 
       <Button size="sm" onClick={onCopy} aria-label="复制到公众号">
         <Clipboard data-icon="inline-start" />
-        <span className="action-label">复制到公众号</span>
+        <span className="max-[700px]:hidden">复制到公众号</span>
       </Button>
     </div>
   );

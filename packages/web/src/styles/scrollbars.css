@@ -1,0 +1,70 @@
+/* ============================================================
+   scrollbars.css — 自定义滚动条（WebKit + Firefox 回退）
+   ============================================================ */
+
+/* ---------------- 自定义滚动条 ---------------- */
+@supports not selector(::-webkit-scrollbar) {
+  .code-edit .cm-scroller,
+  .phone-stage,
+  .article-scroll,
+  .tree-body,
+  .outline-drawer {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(90, 82, 68, 0.28) transparent;
+  }
+}
+
+.code-edit .cm-scroller::-webkit-scrollbar,
+.phone-stage::-webkit-scrollbar,
+.article-scroll::-webkit-scrollbar,
+.tree-body::-webkit-scrollbar,
+.outline-drawer::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.code-edit .cm-scroller::-webkit-scrollbar-track,
+.phone-stage::-webkit-scrollbar-track,
+.article-scroll::-webkit-scrollbar-track,
+.tree-body::-webkit-scrollbar-track,
+.outline-drawer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-edit .cm-scroller::-webkit-scrollbar-thumb,
+.phone-stage::-webkit-scrollbar-thumb,
+.article-scroll::-webkit-scrollbar-thumb,
+.tree-body::-webkit-scrollbar-thumb,
+.outline-drawer::-webkit-scrollbar-thumb {
+  background: rgba(90, 82, 68, 0.16);
+  border-radius: 999px;
+  /* 透明边框 + padding-box：让滑块看起来更细，又保留可点击宽度 */
+  border: 2.5px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.16s ease;
+}
+
+.code-edit .cm-scroller:hover::-webkit-scrollbar-thumb,
+.phone-stage:hover::-webkit-scrollbar-thumb,
+.article-scroll:hover::-webkit-scrollbar-thumb,
+.tree-body:hover::-webkit-scrollbar-thumb,
+.outline-drawer:hover::-webkit-scrollbar-thumb {
+  background: rgba(90, 82, 68, 0.3);
+  background-clip: padding-box;
+}
+
+.code-edit .cm-scroller::-webkit-scrollbar-thumb:hover,
+.phone-stage::-webkit-scrollbar-thumb:hover,
+.article-scroll::-webkit-scrollbar-thumb:hover,
+.tree-body::-webkit-scrollbar-thumb:hover,
+.outline-drawer::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 82, 68, 0.45);
+  background-clip: padding-box;
+}
+
+/* 两条滚动条交汇的直角块，默认会是一小片灰色 */
+.code-edit .cm-scroller::-webkit-scrollbar-corner,
+.phone-stage::-webkit-scrollbar-corner,
+.article-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

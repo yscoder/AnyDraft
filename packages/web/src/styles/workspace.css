@@ -1,0 +1,89 @@
+/* ============================================================
+   workspace.css — 工作区（可拖拽分割面板与分隔条）
+   ============================================================ */
+
+/* ---------------- 工作区（可拖拽分割） ---------------- */
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 8px;
+}
+
+.workspace-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+
+.workspace-panel:hover {
+  border-color: rgba(60, 54, 44, 0.14);
+  box-shadow: 0 4px 20px rgba(52, 40, 28, 0.08);
+}
+
+.workspace-panel-head {
+  flex: none;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-panel-head-left {
+  justify-self: start;
+}
+
+.workspace-mode-switch {
+  background: var(--background);
+}
+
+.split {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* shadcn Resizable 分隔条：保留贯穿分界线和中部把手 */
+.workspace-resize-handle {
+  z-index: 5;
+  background: var(--border);
+}
+
+.workspace-resize-handle > div {
+  width: 3px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(60, 54, 44, 0.18);
+  transition: height 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+
+.workspace-resize-handle:hover > div,
+.workspace-resize-handle:focus-visible > div {
+  background: var(--foreground);
+  height: 64px;
+  box-shadow: 0 0 8px color-mix(in oklch, var(--foreground) 28%, transparent);
+}
+
+.workspace.mode-preview .workspace-resize-handle {
+  display: none;
+}
+
+.editor-panel,
+.preview-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}

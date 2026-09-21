@@ -1,0 +1,35 @@
+/* ============================================================
+   responsive.css — 响应式媒体查询与动效偏好
+   ============================================================ */
+
+/* ---------------- 响应式 ---------------- */
+
+@media (max-width: 900px) {
+  .split {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .workspace-resize-handle[aria-orientation='horizontal'] > div {
+    width: 44px;
+    height: 3px;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    padding: 8px;
+  }
+
+  .workspace-panel-head {
+    gap: 8px;
+    padding-inline: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

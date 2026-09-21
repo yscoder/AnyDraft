@@ -60,7 +60,7 @@ import {
 import { loadRootHandle, saveRootHandle } from '@/core/fs/handleStore';
 import type { ContentRepository, Draft, RepoNode } from '@any-draft/shared';
 import { readStored, writeStored } from '@/core/storage';
-import './styles.css';
+import './styles/index.css';
 
 /** 编辑器侧最小宽度（拖拽时保留，预览因此可达 desktop 宽度） */
 const MIN_EDITOR_PX = 180;
@@ -698,52 +698,52 @@ export default function App() {
 
   if (repoStatus !== 'ready') {
     return (
-      <div className="welcome">
-        <div className="welcome-card">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-[radial-gradient(1200px_600px_at_20%_-10%,color-mix(in_oklch,var(--accent)_9%,transparent),transparent),var(--background)]">
+        <div className="w-[min(420px,100%)] flex flex-col gap-3.5 pt-[30px] px-7 pb-6 bg-[var(--panel-solid,#fffdf9)] border border-border rounded-2xl shadow-[0_24px_60px_-30px_rgba(60,54,44,0.25)]">
           <Brand />
 
           {repoStatus === 'unsupported' ? (
             <>
-              <h1>当前浏览器暂不支持</h1>
-              <p>
+              <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">当前浏览器暂不支持</h1>
+              <p className="m-0 text-[13px] leading-[1.7] text-muted-foreground">
                 稿域依赖浏览器的 File System Access 能力读写文件，你的浏览器缺少该能力。
                 请换用 Chrome / Edge 后重新打开本页面。
               </p>
             </>
           ) : repoStatus === 'need-permission' ? (
             <>
-              <h1>继续使用「{pendingName}」</h1>
-              <p>浏览器要求在每次会话中重新确认对该目录的写入权限。</p>
-              <div className="welcome-actions">
+              <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">继续使用「{pendingName}」</h1>
+              <p className="m-0 text-[13px] leading-[1.7] text-muted-foreground">浏览器要求在每次会话中重新确认对该目录的写入权限。</p>
+              <div className="flex flex-col gap-2.5 mt-1.5">
                 <Button size="lg" onClick={() => void handleGrantPermission()}>授权并继续</Button>
-                <button className="welcome-secondary" onClick={handleChangeRoot}>选择其它目录</button>
+                <button className="self-center border-none bg-transparent text-xs text-muted-foreground cursor-pointer underline underline-offset-[3px] hover:text-[var(--accent-strong)]" onClick={handleChangeRoot}>选择其它目录</button>
               </div>
             </>
           ) : repoStatus === 'need-pick' ? (
             <>
               {canPickDirectory() ? (
                 <>
-                  <h1>选择你的工作目录</h1>
-                  <p>
+                  <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">选择你的工作目录</h1>
+                  <p className="m-0 text-[13px] leading-[1.7] text-muted-foreground">
                     草稿会以 .md 文件、图片会以真实图片文件保存在你指定的文件夹里，
                     与本地文件完全同构，可随时用其它工具打开。
                   </p>
-                  <div className="welcome-actions">
+                  <div className="flex flex-col gap-2.5 mt-1.5">
                     <Button size="lg" onClick={() => void handlePickRoot()}>打开目录</Button>
-                    <button className="welcome-secondary" onClick={() => void handleUseOpfs()}>
+                    <button className="self-center border-none bg-transparent text-xs text-muted-foreground cursor-pointer underline underline-offset-[3px] hover:text-[var(--accent-strong)]" onClick={() => void handleUseOpfs()}>
                       改用浏览器内置存储
                     </button>
                   </div>
                 </>
               ) : (
                 <>
-                  <h1>使用浏览器内置存储</h1>
-                  <p>
+                  <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">使用浏览器内置存储</h1>
+                  <p className="m-0 text-[13px] leading-[1.7] text-muted-foreground">
                     当前浏览器/环境禁用了「选择目录」能力（常见于企业策略或安全扩展）。
                     仍可改用浏览器内置存储继续写作：同样支持 .md 文档、文件夹与图片，
                     只是数据存放在浏览器内部，不会出现在你的电脑文件夹里。
                   </p>
-                  <div className="welcome-actions">
+                  <div className="flex flex-col gap-2.5 mt-1.5">
                     <Button size="lg" onClick={() => void handleUseOpfs()}>使用内置存储</Button>
                   </div>
                 </>
@@ -751,23 +751,23 @@ export default function App() {
             </>
           ) : (
             <>
-              <h1>正在检查工作目录…</h1>
+              <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">正在检查工作目录…</h1>
             </>
           )}
 
-          <p className="welcome-foot">文件保存在你的本地，稿域不会上传任何内容。</p>
+          <p className="mt-1.5 pt-3 border-t border-dashed border-border text-[11px] leading-[1.7] text-[var(--faint)]">文件保存在你的本地，稿域不会上传任何内容。</p>
         </div>
       </div>
     );
   }
 
   return (
-    <SidebarProvider className="app-shell">
+    <SidebarProvider className="h-full min-h-0">
       <Sidebar className="app-sidebar border-r-0!" collapsible="offcanvas">
-        <SidebarHeader className="app-sidebar-head">
+        <SidebarHeader className="min-h-[55px] justify-center px-3.5 py-3">
           <Brand />
         </SidebarHeader>
-        <SidebarContent className="app-sidebar-content">
+        <SidebarContent className="overflow-hidden">
           <FileTree
             rootName={rootName}
             tree={tree}
@@ -787,7 +787,7 @@ export default function App() {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="app">
+      <SidebarInset className="h-full min-w-0">
         <div className={`workspace ${isPreviewOnly ? 'mode-preview' : ''}`}>
           <section className="workspace-panel">
             <div className="workspace-panel-head">

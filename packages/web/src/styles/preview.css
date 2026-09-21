@@ -1,0 +1,408 @@
+/* ============================================================
+   preview.css — 预览设备框架
+   含：手机 / 平板 / 桌面 三种设备外壳、
+        状态栏、灵动岛、文章头、底部 home indicator
+   ============================================================ */
+
+/* ---------------- Preview: phone / pad / desktop, picked by hand ---------------- */
+
+/* 文章主题令牌（由 PreviewPane 从当前主题注入到 :root，
+   供预览壳层（状态栏/文章头/底栏）跟随主题配色） */
+:root {
+  --art-bg: #ffffff;
+  --art-ink: #2b2b28;
+  --art-accent: #d97757;
+  --art-heading: #1f1f1c;
+  --art-heading-font: var(--serif);
+  --art-hr: #e5e3dc;
+  --art-foot-text: #8a867e;
+}
+
+.phone-stage {
+  flex: 1;
+  overflow: auto;
+  padding: 26px 20px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* iPhone 设备框：钛金属边框 + 细高光内圈 */
+.phone-frame {
+  position: relative;
+  width: 420px;
+  max-width: 100%;
+  height: 100%;
+  /* iPhone 的圆角是连续曲率，半径给大一些更接近真机观感 */
+  border-radius: 56px;
+  padding: 11px;
+  background: linear-gradient(148deg, #6f6a63 0%, #302c27 26%, #1d1a17 52%, #3a3630 78%, #6b665f 100%);
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.55);
+}
+
+/* 侧键：左侧操作/音量，右侧电源 */
+.phone-frame .side-btn {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #514c45, #2a2622);
+}
+
+.phone-frame .side-btn.action {
+  left: -3px;
+  top: 104px;
+  height: 30px;
+}
+
+.phone-frame .side-btn.vol-up {
+  left: -3px;
+  top: 150px;
+  height: 54px;
+}
+
+.phone-frame .side-btn.vol-down {
+  left: -3px;
+  top: 216px;
+  height: 54px;
+}
+
+.phone-frame .side-btn.power {
+  right: -3px;
+  top: 168px;
+  height: 78px;
+  background: linear-gradient(270deg, #514c45, #2a2622);
+}
+
+.phone-screen {
+  position: relative;
+  height: 100%;
+  border-radius: 45px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--art-bg);
+  color: var(--art-ink);
+  /* 手机模式：整体缩放，呈现真实手机阅读尺寸 */
+  zoom: 0.92;
+  transition: none;
+}
+
+/* Mac 窗口标题栏（桌面模式显示） */
+.desktop-bar {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: #f4f1eb;
+  border-bottom: 1px solid rgba(60, 54, 44, 0.1);
+  position: relative;
+}
+
+.desktop-bar .traffic {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.desktop-bar .traffic.t1 {
+  background: #ff5f57;
+}
+
+.desktop-bar .traffic.t2 {
+  background: #febc2e;
+}
+
+.desktop-bar .traffic.t3 {
+  background: #28c840;
+}
+
+.desktop-bar .bar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a857a;
+}
+
+/* 手机状态栏（跟随主题） */
+.statusbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* 灵动岛占据顶部中央，状态栏内容分列两侧 */
+  padding: 15px 26px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  position: relative;
+  z-index: 5;
+  color: var(--art-heading);
+  background: var(--art-bg);
+  transition: none;
+}
+
+.statusbar .time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 灵动岛（Dynamic Island）：药丸形，压在状态栏中央 */
+.statusbar .dynamic-island {
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  transform: translateX(-50%);
+  width: 84px;
+  height: 25px;
+  border-radius: 999px;
+  background: #0b0a09;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+}
+
+/* 摄像头：灵动岛右侧的一点微光 */
+.statusbar .dynamic-island::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 32%, #2f3a44 0%, #14181c 62%, #0b0a09 100%);
+}
+
+.statusbar .sb-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 文章滚动区 */
+.article-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* 底部 home indicator：浮在内容之上，正文从下面滚过 */
+.home-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  transform: translateX(-50%);
+  width: 116px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--art-ink);
+  opacity: 0.32;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* 文章头：标题 + 作者行 */
+.article-head {
+  padding: 12px 28px 0;
+  background: var(--art-bg);
+  transition: none;
+}
+
+.article-head .head-title {
+  font-family: var(--art-heading-font);
+  font-weight: 700;
+  font-size: 25px;
+  line-height: 1.35;
+  color: var(--art-heading);
+  margin: 0;
+  transition: none;
+}
+
+.article-head .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--art-hr);
+  transition: none;
+}
+
+.article-head .author {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--art-ink);
+  transition: none;
+}
+
+.article-head .byline {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--art-foot-text);
+  transition: none;
+}
+
+.article-head .byline::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--art-foot-text);
+}
+
+/* 正文容器：样式全部内联 ⇒ 预览与导出（微信粘贴）同构 */
+.check-body {
+  padding: 6px 28px 8px;
+}
+
+/* ---------------- Pad (foldable inner screen, held landscape) ----------------
+   A book-style foldable opened flat: one wide screen in a polished rim,
+   no outer/back half. Fixed proportions; PreviewPane zooms the whole frame
+   to fit the stage. Keep the frame size in step with PAD_FRAME there. */
+
+/* Star White: near-uniform matte white glass in a thin, neutral steel rim */
+.preview-side[data-device='pad'] {
+  --duo-rim: linear-gradient(148deg, #f4f4f2 0%, #8e8d89 12%, #e4e3df 26%, #6e6d69 44%, #d6d5d1 60%, #7f7e7a 78%, #f0efec 100%);
+}
+
+/* Night Sky under a dark paper (the web build has no shell dark mode, so the
+   article theme's appearance decides): deep navy glass, a darker polished rim */
+.preview-side[data-appearance='dark'][data-device='pad'] {
+  --duo-rim: linear-gradient(148deg, #a9b2c2 0%, #3b4250 12%, #7e8797 26%, #1b1f28 44%, #6d7686 60%, #2a303c 78%, #9aa3b3 100%);
+}
+
+.preview-side[data-device='pad'] .phone-stage {
+  align-items: center;
+}
+
+.preview-side[data-device='pad'] .phone-frame {
+  flex: none;
+  display: flex;
+  gap: 2px; /* the hinge seam: the rim shows through between the halves */
+  padding: 4px; /* the polished rim */
+  background: var(--duo-rim);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 0.75px rgba(0, 0, 0, 0.35), /* where the metal meets the air */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45); /* the polished lip */
+  height: auto;
+  width: 100%;
+  aspect-ratio: 16/10;
+  border-radius: 47px;
+}
+
+/* The screen sits in a black bezel, inside the rim */
+.preview-side[data-device='pad'] .phone-screen {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 8px solid #070707;
+  border-radius: 47px;
+}
+
+.preview-side[data-device='pad'] .side-btn {
+  background: var(--duo-rim);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+}
+
+.preview-side[data-device='pad'] .side-btn.action {
+  display: none;
+}
+
+/* Two buttons on the top edge, one on the outer side */
+.preview-side[data-device='pad'] .side-btn.vol-up,
+.preview-side[data-device='pad'] .side-btn.vol-down {
+  top: -3px;
+  width: 57px;
+  height: 3px;
+}
+
+.preview-side[data-device='pad'] .side-btn.vol-up {
+  left: auto;
+  right: 96px;
+}
+
+.preview-side[data-device='pad'] .side-btn.vol-down {
+  left: auto;
+  right: 168px;
+}
+
+.preview-side[data-device='pad'] .side-btn.power {
+  top: 162px;
+  height: 106px;
+}
+
+/* A roomier side margin on the pad's wider screen */
+.preview-side[data-device='pad'] .article-head,
+.preview-side[data-device='pad'] .check-body,
+.preview-side[data-device='pad'] .article-footer {
+  padding-left: 36px;
+  padding-right: 36px;
+}
+
+/* Only the title wraps before the stack; the byline divider keeps the full measure */
+.preview-side[data-device='pad'] .article-head .head-title {
+  padding-right: 28px;
+}
+
+/* The inner screen's camera sits under the display: no island there */
+.preview-side[data-device='pad'] .dynamic-island {
+  display: none;
+}
+
+/* ---------------- Desktop mode (the 桌面 choice) ----------------
+   Same markup, different chrome: the device rail gives way to a plain
+   window so the wider measure is what you are judging. */
+.preview-side[data-width='desktop'] .phone-stage {
+  padding: 26px 28px 40px;
+}
+
+.preview-side[data-width='desktop'] .phone-frame {
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.preview-side[data-width='desktop'] .side-btn,
+.preview-side[data-width='desktop'] .home-indicator {
+  display: none;
+}
+
+.preview-side[data-width='desktop'] .phone-screen {
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(60, 54, 44, 0.14);
+  border-radius: 14px;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-lg);
+  /* 桌面模式：还原正常字号 */
+  zoom: 1;
+}
+
+.preview-side[data-width='desktop'] .desktop-bar {
+  display: flex;
+}
+
+.preview-side[data-width='desktop'] .statusbar {
+  display: none;
+}
+
+.preview-side[data-width='desktop'] .article-head {
+  padding: 34px 56px 0;
+}
+
+.preview-side[data-width='desktop'] .check-body {
+  padding: 8px 56px 8px;
+}
+
+.preview-side[data-width='desktop'] .article-footer {
+  padding: 14px 56px 24px;
+}

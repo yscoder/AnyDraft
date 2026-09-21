@@ -1,21 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   Eraser,
   File,
   FilePlus,
   FileText,
-  FolderOpen,
   FolderPlus,
   Image as ImageIcon,
+  MoreHorizontal,
   Pencil,
   RefreshCw,
   Trash2,
 } from 'lucide-react';
 import type { RepoNode } from '@any-draft/shared';
+import { cn } from 'cn';
 import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 import { TooltipHint } from '@/components/ui/tooltip';
+import {
+  TreeExpander,
+  TreeIcon,
+  TreeLabel,
+  TreeNode,
+  TreeNodeContent,
+  TreeNodeTrigger,
+  TreeProvider,
+  TreeView,
+} from '@/components/kibo-ui/tree';
 
 /** 目录树的递归分支 */
 export interface TreeBranch {
@@ -39,6 +55,10 @@ interface Props {
   onCleanupImages: () => void;
 }
 
+/** 下拉菜单触发按钮：hover/聚焦/菜单打开时显形 */
+const menuTriggerBtn =
+  'size-5 inline-flex items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground cursor-pointer transition-colors hover:bg-background hover:text-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 data-[state=open]:opacity-100';
+
 function relativeTime(ts: number, now: number): string {
   const diff = Math.max(0, now - ts);
   const min = Math.floor(diff / 60000);
@@ -58,7 +78,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** 文件图标按节点种类映射 */
+/** 文件图标按节点种类映射（目录由 kibo-ui 默认 Folder/FolderOpen 处理） */
 function nodeIcon(kind: RepoNode['kind']) {
   if (kind === 'markdown') return <FileText size={14} />;
   if (kind === 'image') return <ImageIcon size={14} />;
@@ -66,8 +86,9 @@ function nodeIcon(kind: RepoNode['kind']) {
 }
 
 /**
- * 文件树：真实目录结构。
+ * 文件树：基于 kibo-ui tree 原语的真实目录结构。
  * 树里只允许新建 md 文件与文件夹；图片与其它文件灰显只读。
+ * 节点操作合并到下拉菜单中，移除了所有动画效果。
  */
 export default function FileTree({
   rootName,
@@ -84,7 +105,6 @@ export default function FileTree({
   onLocateImage,
   onCleanupImages,
 }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['']));
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -94,156 +114,173 @@ export default function FileTree({
     if (renamingPath) renameInputRef.current?.select();
   }, [renamingPath]);
 
-  const toggle = (path: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-
   const submitRename = () => {
     if (renamingPath && renameValue.trim()) onRename(renamingPath, renameValue);
     setRenamingPath(null);
     setRenameValue('');
   };
 
-  const renameInput = (path: string) => (
-    <div key={path} className="tree-file renaming">
-      {nodeIcon('markdown')}
-      <input
-        ref={renameInputRef}
-        className="tree-rename-input"
-        value={renameValue}
-        onChange={(e) => setRenameValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') submitRename();
-          if (e.key === 'Escape') setRenamingPath(null);
-        }}
-        onBlur={submitRename}
-      />
-    </div>
+  /** 重命名行：替换 TreeNodeTrigger，保留缩进对齐 */
+  const renameRow = (path: string, level: number) => (
+    <TreeNode key={path} nodeId={path} level={level}>
+      <div
+        className="flex items-center gap-1.5 mx-1 my-0.5 rounded-md bg-card ring-2 ring-ring/35"
+        style={{ paddingLeft: level * 20 + 11, paddingRight: 12, paddingTop: 5, paddingBottom: 5 }}
+      >
+        <span className="flex-none opacity-55">
+          <FileText size={14} />
+        </span>
+        <input
+          ref={renameInputRef}
+          className="flex-1 min-w-0 border-none bg-transparent font-inherit text-xs text-foreground outline-none"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submitRename();
+            if (e.key === 'Escape') setRenamingPath(null);
+          }}
+          onBlur={submitRename}
+        />
+      </div>
+    </TreeNode>
   );
 
-  const renderNode = (branch: TreeBranch) => {
+  /** 节点操作下拉菜单 */
+  const renderNodeMenu = (node: RepoNode, isDir: boolean) => {
+    const isMd = node.kind === 'markdown';
+    const showNewActions = isDir;
+    const showEditActions = (isDir && node.path !== '') || (!isDir && isMd);
+    if (!showNewActions && !showEditActions) return null;
+
+    return (
+      <span className="flex-none">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label="更多操作"
+              className={menuTriggerBtn}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal size={12} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={4}>
+            {showNewActions && (
+              <>
+                <DropdownMenuItem onSelect={() => onCreateMarkdown(node.path)}>
+                  <FilePlus size={14} /> 新建文档
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onCreateDirectory(node.path)}>
+                  <FolderPlus size={14} /> 新建文件夹
+                </DropdownMenuItem>
+              </>
+            )}
+            {showNewActions && showEditActions && <DropdownMenuSeparator />}
+            {showEditActions && (
+              <>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setRenamingPath(node.path);
+                    setRenameValue(node.name);
+                  }}
+                >
+                  <Pencil size={14} /> 重命名
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => onDelete(node.path)}
+                >
+                  <Trash2 size={14} /> 删除
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
+    );
+  };
+
+  const renderNode = (branch: TreeBranch, level: number, isLast: boolean) => {
     const { node, children } = branch;
     const isDir = node.kind === 'dir';
     const isMd = node.kind === 'markdown';
     const isImage = node.kind === 'image';
     const isActive = node.path === activePath;
-    const open = expanded.has(node.path);
-
-    if (renamingPath === node.path) return renameInput(node.path);
-
-    // 目录行：点击展开/收起，hover 显示「新建 md / 新建文件夹 / 重命名 / 删除」
-    if (isDir) {
-      return (
-        <div key={node.path}>
-          <div className="tree-file dir">
-            <button className="tree-folder-main" onClick={() => toggle(node.path)}>
-              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              <FolderOpen size={14} />
-              <span className="tree-folder-name">{node.name}</span>
-              {node.path === '' && <span className="tree-count">{markdownCount}</span>}
-            </button>
-            <span className="tree-file-actions">
-              <TooltipHint content="新建文档">
-                <button aria-label="新建文档" onClick={() => onCreateMarkdown(node.path)}>
-                  <FilePlus size={12} />
-                </button>
-              </TooltipHint>
-              <TooltipHint content="新建文件夹">
-                <button aria-label="新建文件夹" onClick={() => onCreateDirectory(node.path)}>
-                  <FolderPlus size={12} />
-                </button>
-              </TooltipHint>
-              {node.path !== '' && (
-                <>
-                  <TooltipHint content="重命名">
-                    <button
-                      aria-label={`重命名 ${node.name}`}
-                      onClick={() => {
-                        setRenamingPath(node.path);
-                        setRenameValue(node.name);
-                      }}
-                    >
-                      <Pencil size={12} />
-                    </button>
-                  </TooltipHint>
-                  <TooltipHint content="删除">
-                    <button aria-label={`删除 ${node.name}`} onClick={() => onDelete(node.path)}>
-                      <Trash2 size={12} />
-                    </button>
-                  </TooltipHint>
-                </>
-              )}
-            </span>
-          </div>
-          {open && (
-            <div className="tree-children" role="group">
-              {children.length === 0 ? (
-                <p className="tree-empty">空文件夹</p>
-              ) : (
-                children.map(renderNode)
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // 文件行：md 可编辑，图片与其它文件灰显只读
     const readonly = !isMd;
-    const className = `tree-file ${isActive ? 'active' : ''} ${readonly ? 'readonly' : ''} ${isImage ? 'image' : ''}`;
+
+    if (renamingPath === node.path) return renameRow(node.path, level);
+
     const meta = isImage
       ? `${formatBytes(node.size ?? 0)}`
       : isMd
         ? relativeTime(node.updatedAt ?? now, now)
         : '';
+
     return (
-      <div key={node.path} className={className} role="treeitem" aria-selected={isActive}>
-        <button
-          className="tree-file-main"
+      <TreeNode key={node.path} nodeId={node.path} level={level} isLast={isLast}>
+        <TreeNodeTrigger
+          className={cn(
+            isActive && 'bg-accent',
+            !isImage && readonly && 'cursor-default',
+          )}
           onClick={() => {
             if (isImage) onLocateImage(node.name);
             else if (isMd) onSelect(node.path);
           }}
-          style={readonly && !isImage ? { cursor: 'default' } : undefined}
         >
-          {nodeIcon(node.kind)}
-          <span className="tree-file-text">
-            <span className="tree-file-name">{node.name}</span>
-            {meta && <span className="tree-file-meta">{meta}</span>}
-          </span>
-        </button>
-        {isMd && (
-          <span className="tree-file-actions">
-            <TooltipHint content="重命名">
-              <button
-                aria-label={`重命名 ${node.name}`}
-                onClick={() => {
-                  setRenamingPath(node.path);
-                  setRenameValue(node.name);
-                }}
+          <TreeExpander hasChildren={isDir} />
+          <TreeIcon
+            icon={isDir ? undefined : nodeIcon(node.kind)}
+            hasChildren={isDir}
+            className={cn(
+              isActive ? 'opacity-100 text-foreground' : 'opacity-55',
+              !isImage && readonly && 'opacity-35',
+            )}
+          />
+          {isDir ? (
+            <TreeLabel className="text-xs font-semibold">{node.name}</TreeLabel>
+          ) : (
+            <span className="flex flex-col gap-px flex-1 min-w-0">
+              <span
+                className={cn(
+                  'text-xs leading-[1.3] truncate',
+                  isActive && 'font-semibold text-foreground',
+                  readonly && 'text-muted-foreground',
+                )}
               >
-                <Pencil size={12} />
-              </button>
-            </TooltipHint>
-            <TooltipHint content="删除">
-              <button aria-label={`删除 ${node.name}`} onClick={() => onDelete(node.path)}>
-                <Trash2 size={12} />
-              </button>
-            </TooltipHint>
-          </span>
+                {node.name}
+              </span>
+              {meta && (
+                <span className="text-[9.5px] text-muted-foreground/70 truncate">
+                  {meta}
+                </span>
+              )}
+            </span>
+          )}
+          {renderNodeMenu(node, isDir)}
+        </TreeNodeTrigger>
+        {isDir && (
+          <TreeNodeContent hasChildren>
+            {children.length === 0 ? (
+              <p className="m-1 ml-1.5 text-[10.5px] leading-[1.5] text-muted-foreground/70">
+                空文件夹
+              </p>
+            ) : (
+              children.map((b, i) => renderNode(b, level + 1, i === children.length - 1))
+            )}
+          </TreeNodeContent>
         )}
-      </div>
+      </TreeNode>
     );
   };
 
+  // 根目录节点：工作目录本身，可展开显示顶层内容
+  const rootNode: RepoNode = { kind: 'dir', name: rootName, path: '' };
+
   return (
-    <nav className="file-tree" aria-label="文件">
-      <div className="tree-head">
-        <span className="tree-head-label font-semibold">文件</span>
+    <nav className="flex flex-col flex-1 w-full min-h-0 overflow-hidden" aria-label="文件">
+      <div className="flex-none flex items-center justify-between gap-1.5 min-h-10 py-[7px] pr-2 pl-3.5">
+        <span className="text-xs font-semibold text-muted-foreground">文件</span>
         <TooltipHint content="刷新目录">
           <Button
             variant="ghost"
@@ -257,35 +294,33 @@ export default function FileTree({
         </TooltipHint>
       </div>
 
-      <div className="tree-body" role="tree" aria-label="文件">
-        {/* 根目录行：工作目录本身，展开后即顶层内容 */}
-        <div className="tree-file dir">
-          <button className="tree-folder-main" onClick={() => toggle('')}>
-            {expanded.has('') ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-            <FolderOpen size={14} />
-            <span className="tree-folder-name">{rootName}</span>
-            <span className="tree-count">{markdownCount}</span>
-          </button>
-          <span className="tree-file-actions">
-            <TooltipHint content="新建文档">
-              <button aria-label="新建文档" onClick={() => onCreateMarkdown('')}>
-                <FilePlus size={12} />
-              </button>
-            </TooltipHint>
-            <TooltipHint content="新建文件夹">
-              <button aria-label="新建文件夹" onClick={() => onCreateDirectory('')}>
-                <FolderPlus size={12} />
-              </button>
-            </TooltipHint>
-          </span>
-        </div>
-        {expanded.has('') && (
-          <div className="tree-children" role="group">
-            {tree.length === 0 ? <p className="tree-empty">点击上方 + 新建第一篇文档</p> : tree.map(renderNode)}
-          </div>
-        )}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-1.5" role="tree" aria-label="文件">
+        <TreeProvider defaultExpandedIds={['']} selectable={false}>
+          <TreeView className="p-0 overflow-hidden">
+            <TreeNode nodeId="" level={0} isLast>
+              <TreeNodeTrigger>
+                <TreeExpander hasChildren />
+                <TreeIcon hasChildren />
+                <TreeLabel className="text-xs font-semibold">{rootName}</TreeLabel>
+                {renderNodeMenu(rootNode, true)}
+              </TreeNodeTrigger>
+              <TreeNodeContent hasChildren>
+                {tree.length === 0 ? (
+                  <p className="m-1 ml-1.5 text-[10.5px] leading-[1.5] text-muted-foreground/70">
+                    点击上方 + 新建第一篇文档
+                  </p>
+                ) : (
+                  tree.map((b, i) => renderNode(b, 1, i === tree.length - 1))
+                )}
+              </TreeNodeContent>
+            </TreeNode>
+          </TreeView>
+        </TreeProvider>
         {unusedImageCount > 0 && (
-          <button className="tree-cleanup" onClick={onCleanupImages}>
+          <button
+            className="flex items-center gap-1.5 w-full mt-0.5 mx-1 px-1.5 py-1.5 border border-transparent bg-transparent rounded-lg text-[11px] text-muted-foreground cursor-pointer transition-colors hover:bg-accent hover:text-foreground"
+            onClick={onCleanupImages}
+          >
             <Eraser size={13} />
             清理 {unusedImageCount} 张未引用图片
           </button>

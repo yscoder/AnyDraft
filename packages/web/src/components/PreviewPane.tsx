@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BatteryFull, Signal, Wifi } from 'lucide-react';
+import { cn } from 'cn';
+import { BatteryFull, Signal, Wifi, Smartphone, Tablet, Monitor, type LucideIcon } from 'lucide-react';
 import { TooltipHint } from '@/components/ui/tooltip';
 import { extractTitle, stripFirstH1 } from '@/core/markdown/markdown';
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
@@ -30,46 +31,23 @@ const TAIL_BLEND = 0.18;
 /**
  * What the preview is drawn as — always exactly what was picked, whatever the
  * pane's width:
- * - iphone: the phone frame
- * - duo: iPhone Duo lying open, outside up, as in Apple's photos — back half
- *   on the left, outer screen (the article) on the right
- * - duo-open: the Duo's inner screen, held landscape
+ * - phone: the phone frame
+ * - pad: a foldable's inner screen, held landscape
  * - desktop: a macOS window, for judging the wide measure
  */
-type PreviewDevice = 'iphone' | 'duo' | 'duo-open' | 'desktop';
-type DuoView = 'duo' | 'duo-open';
+type PreviewDevice = 'phone' | 'pad' | 'desktop';
 
-const DEVICES: { id: PreviewDevice; name: string; hint: string }[] = [
-  { id: 'iphone', name: 'iPhone', hint: 'iPhone 竖屏' },
-  {
-    id: 'duo',
-    name: 'Duo 外屏',
-    hint: 'iPhone Duo 摊开、外侧朝上：左边背壳，右边外屏（466×678pt）。面板窄时整台缩小，切到「预览」模式看得更清楚',
-  },
-  {
-    id: 'duo-open',
-    name: 'Duo 内屏',
-    hint: 'iPhone Duo 展开、内屏横握（890×626pt）。面板窄时整台缩小，切到「预览」模式看得更清楚',
-  },
-  { id: 'desktop', name: '桌面', hint: '桌面版式：macOS 窗口里的宽排版' },
+const DEVICES: { id: PreviewDevice; name: string; icon: LucideIcon }[] = [
+  { id: 'phone', name: '手机', icon: Smartphone },
+  { id: 'pad', name: '平板', icon: Tablet },
+  { id: 'desktop', name: '桌面', icon: Monitor },
 ];
 
-/** Per browser, like the theme choice: it is how you like to look, not part of the draft */
-const STORAGE_DEVICE = 'anydraft:preview-device';
+/** Unzoomed frame size of the pad view; keep in step with the
+ *  [data-device='pad'] .phone-frame rules in styles/preview.css */
+const PAD_FRAME = { width: 842, height: 599 };
 
-function readDevice(): PreviewDevice {
-  const v = localStorage.getItem(STORAGE_DEVICE);
-  return DEVICES.find((d) => d.id === v)?.id ?? 'iphone';
-}
-
-/** Unzoomed frame sizes of the two Duo views; keep in step with the
- *  [data-device^='duo'] .phone-frame rules in styles.css */
-const DUO_FRAMES: Record<DuoView, { width: number; height: number }> = {
-  duo: { width: 897, height: 647 },
-  'duo-open': { width: 842, height: 599 },
-};
-
-/** The stage's content box, which the Duo views fit into */
+/** The stage's content box, which the pad view fits into */
 function measure(stage: HTMLElement | null) {
   let w = 0;
   let h = 0;
@@ -82,11 +60,10 @@ function measure(stage: HTMLElement | null) {
   return { w, h };
 }
 
-/** Zoom that fits a Duo view into the stage, keeping its real proportions (1 = real size) */
+/** Zoom that fits the pad view into the stage, keeping its real proportions (1 = real size) */
 function fitFor(device: PreviewDevice, w: number, h: number): number {
-  if ((device !== 'duo' && device !== 'duo-open') || w <= 0 || h <= 0) return 1;
-  const f = DUO_FRAMES[device];
-  return Math.max(0.3, Math.round(Math.min(1, w / f.width, h / f.height) * 1000) / 1000);
+  if (device !== 'pad' || w <= 0 || h <= 0) return 1;
+  return Math.max(0.3, Math.round(Math.min(1, w / PAD_FRAME.width, h / PAD_FRAME.height) * 1000) / 1000);
 }
 
 /**
@@ -144,7 +121,7 @@ function buildAnchors(scroll: HTMLElement): Anchor[] {
   const box = scroll.getBoundingClientRect();
   // Rects are in visual pixels, scrollTop in the scroller's own layout pixels.
   // They differ by every zoom above the scroller (0.92 on the phone screen,
-  // times the fit-to-pane zoom of the Duo views), and engines disagree on
+  // times the fit-to-pane zoom of the pad view), and engines disagree on
   // whether rects include zoom at all — so measure the ratio, don't assume it.
   const k = scroll.offsetHeight > 0 ? box.height / scroll.offsetHeight : 1;
   const anchors: Anchor[] = [];
@@ -158,7 +135,7 @@ function buildAnchors(scroll: HTMLElement): Anchor[] {
 
 /**
  * The right-hand preview, drawn as the chosen device (see PreviewDevice):
- * - the Duo views keep their real proportions and zoom to fit the pane
+ * - the pad view keeps its real proportions and zooms to fit the pane
  * - desktop is a macOS window with a traffic-light title bar
  * - article head on top (title plus byline), action bar at the end of the content
  * Every style in the body HTML is inline ⇒ preview and export (the WeChat
@@ -169,13 +146,9 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  /** Content box of the device stage, for fitting the Duo views */
+  /** Content box of the device stage, for fitting the pad view */
   const [stage, setStage] = useState({ w: 0, h: 0 });
-  const [device, setDeviceState] = useState<PreviewDevice>(readDevice);
-  const setDevice = (next: PreviewDevice) => {
-    localStorage.setItem(STORAGE_DEVICE, next);
-    setDeviceState(next);
-  };
+  const [device, setDevice] = useState<PreviewDevice>('phone');
   /** What actually gets drawn */
   const layout = device === 'desktop' ? 'desktop' : 'phone';
   const fit = fitFor(device, stage.w, stage.h);
@@ -185,7 +158,7 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
   /** Date in the article head (a new Date() on every render means nothing) */
   const today = useMemo(() => new Date(), []);
 
-  // Track the stage size as the pane resizes, for fitting the Duo views
+  // Track the stage size as the pane resizes, for fitting the pad view
   useEffect(() => {
     const pane = paneRef.current;
     if (!pane) return;
@@ -320,60 +293,39 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
       data-width={layout}
       data-device={device}
       // The web build has no shell dark mode: the paper decides, so a dark
-      // theme gets the Night Sky Duo and a light one Star White
+      // theme gets the Night Sky pad and a light one Star White
       data-appearance={theme.appearance}
     >
       <div className="preview-toolbar">
-        <div className="segmented device-switch" role="radiogroup" aria-label="预览机型">
-          {DEVICES.map((d) => (
-            <TooltipHint key={d.id} content={d.hint}>
-              <button
-                role="radio"
-                aria-checked={device === d.id}
-                className={`seg-btn ${device === d.id ? 'active' : ''}`}
-                onClick={() => setDevice(d.id)}
-              >
-                {d.name}
-              </button>
-            </TooltipHint>
-          ))}
+        <div className="inline-grid grid-cols-3 bg-[rgba(60,54,44,0.055)] rounded-lg p-0.5 gap-px" role="radiogroup" aria-label="预览机型">
+          {DEVICES.map((d) => {
+            const Icon = d.icon;
+            return (
+              <TooltipHint key={d.id} content={d.name}>
+                <button
+                  role="radio"
+                  aria-checked={device === d.id}
+                  className={cn(
+                    'border-none bg-transparent px-2 py-1.5 rounded-md cursor-pointer text-muted-foreground flex items-center justify-center transition-colors duration-[160ms] ease-[var(--ease)] hover:text-foreground',
+                    device === d.id && 'bg-[var(--panel-solid)] text-foreground',
+                  )}
+                  onClick={() => setDevice(d.id)}
+                >
+                  <Icon size={16} />
+                </button>
+              </TooltipHint>
+            );
+          })}
         </div>
       </div>
       <div className="phone-stage" ref={stageRef}>
-        <div className="phone-frame" style={device === 'duo' || device === 'duo-open' ? { zoom: fit } : undefined}>
-          {/* Side buttons (phone mode): on the iPhone, action and volume left,
-              power right; the Duo views move them to where its edges carry them */}
+        <div className="phone-frame" style={device === 'pad' ? { zoom: fit } : undefined}>
+          {/* Side buttons (phone mode): on the phone, action and volume left,
+              power right; the pad moves them to where its edges carry them */}
           <span className="side-btn action" aria-hidden="true"></span>
           <span className="side-btn vol-up" aria-hidden="true"></span>
           <span className="side-btn vol-down" aria-hidden="true"></span>
           <span className="side-btn power" aria-hidden="true"></span>
-          {/* iPhone Duo's back half, lying beside the outer screen */}
-          {device === 'duo' && (
-            <div className="duo-back" aria-hidden="true">
-              <div className="duo-plateau">
-                <span className="duo-lens l1"></span>
-                <span className="duo-lens l2"></span>
-                <span className="duo-mic"></span>
-                <span className="duo-flash"></span>
-              </div>
-              {/* The Apple mark — the true outline, from Simple Icons (CC0) —
-                  in one quiet tone with a faint diagonal sheen */}
-              <svg className="duo-logo" viewBox="0 0 24 24" width="112" height="112" aria-hidden="true">
-                <defs>
-                  <linearGradient id="duo-logo-sheen" x1="0" y1="0" x2="1" y2="1">
-                    <stop className="a" offset="0" />
-                    <stop className="sheen" offset="0.46" />
-                    <stop className="a" offset="0.54" />
-                    <stop className="b" offset="1" />
-                  </linearGradient>
-                </defs>
-                <path
-                  fill="url(#duo-logo-sheen)"
-                  d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-                />
-              </svg>
-            </div>
-          )}
           <div className="phone-screen">
             {/* macOS window title bar (desktop mode) */}
             <div className="desktop-bar">
@@ -383,7 +335,7 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
               <span className="bar-title">文章预览 · {theme.name}</span>
             </div>
             {/* Phone status bar: Dynamic Island centered, real status icons on
-                either side. The Duo has no bar: the time and one status ring
+                either side. The pad has no bar: the time and one status ring
                 (Wi-Fi inside, signal as dots) stack in the top-right corner. */}
             <div className="statusbar">
               <span className="time">9:41</span>
@@ -393,22 +345,6 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
                 <Wifi size={13} />
                 <BatteryFull size={17} fill="currentColor" />
               </span>
-              <svg className="sb-orb" viewBox="0 0 32 32" aria-hidden="true">
-                {/* Circle outline over the top and down both sides, to just below the middle */}
-                <path className="ring" d="M1.99 19.75A14.5 14.5 0 1 1 30.01 19.75" />
-                <g className="wifi">
-                  <path d="M13.6 16.1A3.4 3.4 0 0 1 18.4 16.1" />
-                  <path d="M11.19 13.69A6.8 6.8 0 0 1 20.81 13.69" />
-                  <path d="M8.79 11.29A10.2 10.2 0 0 1 23.21 11.29" />
-                </g>
-                <circle cx="16" cy="18.5" r="1.4" />
-                {/* The bottom of the circle, finished in five dots */}
-                <circle cx="27.11" cy="25.32" r="1.15" />
-                <circle cx="22.13" cy="29.14" r="1.15" />
-                <circle cx="16" cy="30.5" r="1.15" />
-                <circle cx="9.87" cy="29.14" r="1.15" />
-                <circle cx="4.89" cy="25.32" r="1.15" />
-              </svg>
             </div>
             <div className="article-scroll" ref={scrollRef}>
               {/* WeChat article head: title (with a placeholder when empty) plus byline */}
@@ -427,8 +363,6 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
                 dangerouslySetInnerHTML={{ __html: previewBody }}
               />
             </div>
-            {/* The fold down the middle of the Duo's inner screen */}
-            <span className="crease" aria-hidden="true"></span>
             {/* Home indicator (phone mode) */}
             <span className="home-indicator" aria-hidden="true"></span>
           </div>
