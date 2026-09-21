@@ -148,36 +148,6 @@ button {
   overflow: hidden;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-/* 印章字标：平涂描边，没有渐变/投影 */
-.brand-mark {
-  width: 23px;
-  height: 23px;
-  border: 1px solid var(--primary);
-  border-radius: 6px;
-  background: var(--primary);
-  display: grid;
-  place-items: center;
-  flex: none;
-  font-family: var(--serif);
-  font-size: 13px;
-  line-height: 1;
-  color: var(--primary-foreground);
-}
-
-.title {
-  font-family: var(--serif);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.6px;
-  color: var(--ink);
-}
-
 .workspace-actions {
   display: flex;
   align-items: center;
@@ -756,15 +726,6 @@ button {
   box-shadow: 0 24px 60px -30px rgba(60, 54, 44, 0.25);
 }
 
-.welcome-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--ink);
-}
-
 .welcome-card h1 {
   margin: 4px 0 0;
   font-size: 17px;
@@ -1210,6 +1171,10 @@ button {
 
 .code-edit .cm-editor {
   height: 100%;
+  font-family: var(--font-sans);
+}
+.code-edit .cm-scroller {
+  font-family: var(--font-sans);
 }
 
 .code-edit .cm-editor.cm-focused {

@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Brand } from '@/components/Brand';
 import EditorPane from '@/components/EditorPane';
 import FileTree, { type TreeBranch } from '@/components/FileTree';
 import PreviewPane from '@/components/PreviewPane';
@@ -699,10 +700,7 @@ export default function App() {
     return (
       <div className="welcome">
         <div className="welcome-card">
-          <div className="welcome-brand">
-            <span className="brand-mark" aria-hidden="true">稿</span>
-            <span>稿域</span>
-          </div>
+          <Brand />
 
           {repoStatus === 'unsupported' ? (
             <>
@@ -767,10 +765,7 @@ export default function App() {
     <SidebarProvider className="app-shell">
       <Sidebar className="app-sidebar border-r-0!" collapsible="offcanvas">
         <SidebarHeader className="app-sidebar-head">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden="true">稿</span>
-            <span className="title">稿域</span>
-          </div>
+          <Brand />
         </SidebarHeader>
         <SidebarContent className="app-sidebar-content">
           <FileTree
