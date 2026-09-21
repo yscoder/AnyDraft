@@ -3,15 +3,9 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-/**
- * 首屏必需、且几乎不变的依赖 —— 单独成块，换版本才失效，日常发版能一直命中缓存。
- * 注意：只列核心包。@codemirror/lang-* 与 legacy-modes 是 @codemirror/language-data
- * 按需动态加载的语法（构建产物里那一百多个小 chunk），
- * 一旦被归进固定块就会全部变成首屏同步依赖。
- */
+
 const VENDOR_GROUPS: Record<string, string[]> = {
   react: ['react', 'react-dom', 'scheduler'],
-  // 图标集几乎不随业务改动，单独成块常驻缓存
   icons: ['lucide-react'],
   codemirror: [
     '@codemirror/state',
@@ -41,7 +35,6 @@ const VENDOR_GROUPS: Record<string, string[]> = {
   ],
 };
 
-/** node_modules 路径 → 所属分组（按包名精确匹配，避免误伤 lang-* 这类同前缀包） */
 function vendorChunk(id: string): string | undefined {
   const m = id.split('node_modules/').pop();
   if (!m) return undefined;
@@ -59,9 +52,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // monorepo：@any-draft/shared 通过 workspace 符号链接解析到 packages/shared，
+  // 开发服务器需要放行根目录；链接包保持源码形态、不做依赖预打包
+  server: {
+    port: 28080,
+    fs: {
+      allow: [path.resolve(__dirname, '../..')],
+    },
+  },
+  optimizeDeps: {
+    exclude: ['@any-draft/shared'],
+  },
   base: './',
   build: {
-    // 语法高亮与编辑器语法包都已按需加载，剩下的主包应远低于该阈值
     chunkSizeWarningLimit: 400,
     rollupOptions: {
       output: {

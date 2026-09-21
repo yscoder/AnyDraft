@@ -5,9 +5,9 @@
  * 换设备 / 清缓存就没了，所以对外还有 core/transfer 的导入导出兜底。
  */
 
-import { SAMPLE_MARKDOWN } from '@/core/markdown/sample';
+import SAMPLE_MARKDOWN from '@/core/markdown/sample.md?raw';
 import { readStored, writeStored } from '@/core/storage';
-import type { Draft } from '@/core/drafts/types';
+import type { Draft } from '@any-draft/shared';
 
 const DRAFTS = 'drafts';
 const ACTIVE_DRAFT = 'active-draft';

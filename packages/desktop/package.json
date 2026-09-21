@@ -1,0 +1,7 @@
+{
+  "name": "@any-draft/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "稿域桌面端（Tauri 2）壳包：规划中、暂未实现，见 README 与 docs/TAURI_DESKTOP_MIGRATION_PLAN.md"
+}

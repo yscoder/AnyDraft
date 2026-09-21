@@ -3,7 +3,7 @@
  */
 
 import { lineReferencesImage } from '@/core/markdown/markdown';
-import type { Draft } from '@/core/drafts/types';
+import type { Draft } from '@any-draft/shared';
 
 /** 找出正文里第一处引用该图片的行号（0-based），没有则返回 -1 */
 function findEmbedLine(content: string, name: string): number {

@@ -18,7 +18,7 @@ import { deleteImage, getAllImages, putImage } from '@/core/image/imagedb';
 import { createScrollSyncChannel } from '@/core/editor/scrollSync';
 import { locateImage } from '@/core/drafts/locate';
 import { initDraftState, rememberActiveDraft, saveDrafts } from '@/core/drafts/storage';
-import type { Draft } from '@/core/drafts/types';
+import type { Draft } from '@any-draft/shared';
 import { readStored, writeStored } from '@/core/storage';
 import './styles.css';
 

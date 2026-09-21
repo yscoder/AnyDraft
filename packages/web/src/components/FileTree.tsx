@@ -10,7 +10,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { Draft } from '@/core/drafts/types';
+import type { Draft } from '@any-draft/shared';
 
 interface Props {
   drafts: Draft[];

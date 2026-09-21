@@ -7,8 +7,7 @@
  * - 全量 `.zip`：草稿 + 图片原始文件 + manifest.json，可以完整导回
  */
 
-import type { Draft } from '@/core/drafts/types';
-import { createZip, readZip, type ZipEntry } from '@/core/transfer/zip';
+import { createZip, readZip, type Draft, type ZipEntry } from '@any-draft/shared';
 
 /** 备份包结构版本；将来改格式靠它区分 */
 const BACKUP_VERSION = 1;
