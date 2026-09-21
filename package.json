@@ -1,12 +1,12 @@
 {
-  "name": "wechat-mp-editor",
+  "name": "any-draft",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name mars-editor --branch main",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name any-draft --branch main",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -43,10 +43,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* ============================================================
-   火星编辑器 · shadcn Maia / neutral 应用外壳
-   （文章正文样式全部内联，本文件不含正文样式）
-   ============================================================ */
+/* shadcn Maia / neutral 应用外壳 */
 
 :root {
   --background: oklch(0.985 0 0);
@@ -1838,18 +1835,6 @@ button {
 }
 
 /* ---------------- 自定义滚动条 ---------------- */
-
-/*
- * 统一所有可滚动容器的滚动条（之前只覆盖了编辑器/预览三处，
- * 主题面板、文件树、大纲还是系统默认的粗滚动条，风格不一致）。
- * 细轨道 + 静置时很淡、hover 才加深，避免在窄面板里喧宾夺主。
- */
-/*
- * 标准属性只留给不支持 ::-webkit-scrollbar 的引擎（主要是 Firefox）。
- * 新版 Chrome 里 scrollbar-width/color 会整体接管、把下面的 ::-webkit-scrollbar
- * 规则连同 hover 加深一起顶掉（实测滑块宽度会变成 11px 而不是设定的 9px），
- * 所以用 @supports 把两套方案隔开，各自生效。
- */
 @supports not selector(::-webkit-scrollbar) {
   .code-edit .cm-scroller,
   .phone-stage,

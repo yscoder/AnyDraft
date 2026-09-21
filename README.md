@@ -1,4 +1,6 @@
-# 火星编辑器 (Mars Editor)
+# 稿域（AnyDraft）
+
+> 公众号创作工作台
 
 Markdown 写作，一键转成**内联样式**富文本，粘贴到微信公众号编辑器即可无损还原。
 
@@ -41,17 +43,17 @@ npm install
 npm run dev      # 开发服务器
 npm run build    # 类型检查 + 生产构建
 npm run preview  # 预览构建产物
-npm run deploy   # 构建并发到 Cloudflare Pages（mars-editor.pages.dev）
+npm run deploy   # 构建并发到 Cloudflare Pages（anydraft.pages.dev）
 ```
 
 ## 发版
 
-线上是 Cloudflare Pages 项目 `mars-editor`，**直传部署，没有接 GitHub 自动构建** ——
+线上是 Cloudflare Pages 项目 `any-draft`，**直传部署，没有接 GitHub 自动构建** ——
 推代码到 main 不会更新线上，必须跑一次：
 
 ```bash
 npm run deploy
 ```
 
-发完可以用 `npx wrangler pages deployment list --project-name mars-editor` 核对，
+发完可以用 `npx wrangler pages deployment list --project-name any-draft` 核对，
 最新一条的 Source 应当是刚推上去的 commit。

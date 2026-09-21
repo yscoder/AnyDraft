@@ -56,10 +56,12 @@ const DEVICES: { id: PreviewDevice; name: string; hint: string }[] = [
 ];
 
 /** Per browser, like the theme choice: it is how you like to look, not part of the draft */
-const STORAGE_DEVICE = 'wechat-mp-editor:preview-device';
+const STORAGE_DEVICE = 'anydraft:preview-device';
+/** 更名前写入的同名 key，作为读取兜底 */
+const LEGACY_STORAGE_DEVICE = 'wechat-mp-editor:preview-device';
 
 function readDevice(): PreviewDevice {
-  const v = localStorage.getItem(STORAGE_DEVICE);
+  const v = localStorage.getItem(STORAGE_DEVICE) ?? localStorage.getItem(LEGACY_STORAGE_DEVICE);
   return DEVICES.find((d) => d.id === v)?.id ?? 'iphone';
 }
 
@@ -420,7 +422,7 @@ export default function PreviewPane({ body, theme, hasImage, resizeKey, sync }: 
               <div className="article-head">
                 <h1 className="head-title">{title || '未命名文章'}</h1>
                 <div className="meta">
-                  <span className="author">火星</span>
+                  <span className="author">稿域</span>
                   <span className="byline">
                     {today.getFullYear()} 年 {today.getMonth() + 1} 月 {today.getDate()} 日
                   </span>

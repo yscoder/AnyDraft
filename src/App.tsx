@@ -19,13 +19,24 @@ import { deleteImage, getAllImages, putImage } from './imagedb';
 import { createScrollSyncChannel } from './scrollSync';
 import './styles.css';
 
-const STORAGE_KEY = 'wechat-mp-editor:md';
-const STORAGE_THEME = 'wechat-mp-editor:theme';
-const STORAGE_DENSITY = 'wechat-mp-editor:density';
-const STORAGE_DRAFTS = 'wechat-mp-editor:drafts';
-const STORAGE_ACTIVE_DRAFT = 'wechat-mp-editor:active-draft';
+/** localStorage / IndexedDB 命名空间：稿域 AnyDraft */
+const NS = 'anydraft';
+/** 更名前使用的命名空间：只作为读取兜底，写入一律用新命名空间 */
+const LEGACY_NS = 'wechat-mp-editor';
+
+const STORAGE_KEY = `${NS}:md`;
+const STORAGE_THEME = `${NS}:theme`;
+const STORAGE_DENSITY = `${NS}:density`;
+const STORAGE_DRAFTS = `${NS}:drafts`;
+const STORAGE_ACTIVE_DRAFT = `${NS}:active-draft`;
 /** 旧版图片注册表存放位置（localStorage），仅用于一次性迁移 */
-const STORAGE_IMAGES = 'wechat-mp-editor:imgs';
+const STORAGE_IMAGES = `${NS}:imgs`;
+
+/** 读取偏好值：优先新命名空间，回落更名前写入的同名 key */
+function readStored(key: string): string | null {
+  return localStorage.getItem(key) ?? localStorage.getItem(`${LEGACY_NS}${key.slice(NS.length)}`);
+}
+
 /** 编辑器侧最小宽度（拖拽时保留，预览因此可达 desktop 宽度） */
 const MIN_EDITOR_PX = 180;
 /** 预览最小宽度（容纳真实手机宽度） */
@@ -41,7 +52,7 @@ interface Draft {
 /** 读草稿列表（localStorage） */
 function loadDrafts(): Draft[] {
   try {
-    const raw = localStorage.getItem(STORAGE_DRAFTS);
+    const raw = readStored(STORAGE_DRAFTS);
     if (raw) {
       const parsed = JSON.parse(raw) as Draft[];
       if (Array.isArray(parsed) && parsed.length) return parsed;
@@ -54,7 +65,7 @@ function loadDrafts(): Draft[] {
 
 /** 迁移旧单草稿：首次使用多草稿时把旧内容变成第一篇草稿 */
 function migrateLegacy(): Draft[] {
-  const legacy = localStorage.getItem(STORAGE_KEY);
+  const legacy = readStored(STORAGE_KEY);
   const initial: Draft = {
     id: `draft-${Date.now()}`,
     name: '未命名草稿',
@@ -85,7 +96,7 @@ function findEmbedLine(content: string, name: string): number {
 function initDraftState(): { drafts: Draft[]; activeId: string } {
   const existing = loadDrafts();
   const list = existing.length ? existing : migrateLegacy();
-  const saved = localStorage.getItem(STORAGE_ACTIVE_DRAFT);
+  const saved = readStored(STORAGE_ACTIVE_DRAFT);
   const activeId = saved && list.some((d) => d.id === saved) ? saved : list[0]?.id ?? '';
   return { drafts: list, activeId };
 }
@@ -110,8 +121,8 @@ export default function App() {
   };
   // 图片注册表存 IndexedDB（容量大），挂载后异步加载到内存供同步渲染
   const [images, setImages] = useState<Record<string, string>>({});
-  const [themeId, setThemeId] = useState<string>(() => localStorage.getItem(STORAGE_THEME) ?? 'classic');
-  const [densityId, setDensityId] = useState<string>(() => localStorage.getItem(STORAGE_DENSITY) ?? 'standard');
+  const [themeId, setThemeId] = useState<string>(() => readStored(STORAGE_THEME) ?? 'classic');
+  const [densityId, setDensityId] = useState<string>(() => readStored(STORAGE_DENSITY) ?? 'standard');
   const [status, setStatus] = useState<string | null>(null);
   /** 导出进行中（长图 / 备份包都要跑一会儿） */
   const [exporting, setExporting] = useState(false);
@@ -170,7 +181,7 @@ export default function App() {
     let cancelled = false;
     void (async () => {
       try {
-        const legacy = localStorage.getItem(STORAGE_IMAGES);
+        const legacy = readStored(STORAGE_IMAGES);
         if (legacy) {
           const legacyMap = JSON.parse(legacy) as Record<string, string>;
           for (const [name, dataUrl] of Object.entries(legacyMap)) {
@@ -397,7 +408,7 @@ export default function App() {
     try {
       await ensureHighlighter();
       const { body } = renderArticle(markdown, theme, images, density);
-      const blob = await renderLongImage({ body, theme, author: '火星' });
+      const blob = await renderLongImage({ body, theme, author: '稿域' });
       downloadBlob(`${safeFileName(activeDraft?.name ?? '长图')}.png`, blob);
       flash('长图已导出');
     } catch (err) {
