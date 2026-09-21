@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import ThemeControls from './ThemeControls';
+import ThemeControls from '@/components/ThemeControls';
 
 interface Props {
   viewMode: 'split' | 'preview';

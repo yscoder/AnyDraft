@@ -9,7 +9,7 @@ import MarkdownIt from 'markdown-it';
 import markdownItFootnote from 'markdown-it-footnote';
 import markdownItMark from 'markdown-it-mark';
 import type { HLJSApi } from 'highlight.js';
-import { applyDensity, getTheme, type DensityScale, type Theme, st } from './theme';
+import { applyDensity, getTheme, type DensityScale, type Theme, st } from '@/core/theme/theme';
 
 /**
  * highlight.js 懒加载。

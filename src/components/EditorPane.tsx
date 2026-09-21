@@ -25,8 +25,8 @@ import { searchKeymap } from '@codemirror/search';
 import { autocompletion } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { registerImageFiles } from '../images';
-import type { ScrollSyncChannel } from '../scrollSync';
+import { registerImageFiles } from '@/core/image/images';
+import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
 
 /* Lucide 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
 const ICON = 16;

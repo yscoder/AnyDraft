@@ -12,7 +12,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { DENSITIES, darkThemes, getTheme, lightThemes, type Theme } from '../theme';
+import { DENSITIES, darkThemes, getTheme, lightThemes, type Theme } from '@/core/theme/theme';
 
 interface Props {
   themeId: string;

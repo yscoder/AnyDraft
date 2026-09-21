@@ -1,105 +1,31 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import EditorPane from './components/EditorPane';
-import FileTree from './components/FileTree';
-import PreviewPane from './components/PreviewPane';
-import Toolbar from './components/Toolbar';
+import EditorPane from '@/components/EditorPane';
+import FileTree from '@/components/FileTree';
+import PreviewPane from '@/components/PreviewPane';
+import Toolbar from '@/components/Toolbar';
+import { collectImageRefs, ensureHighlighter, isHighlighterReady, renderArticle } from '@/core/markdown/markdown';
+import { copyRichText } from '@/core/transfer/clipboard';
 import {
-  collectImageRefs,
-  ensureHighlighter,
-  isHighlighterReady,
-  lineReferencesImage,
-  renderArticle,
-} from './markdown';
-import { copyRichText } from './clipboard';
-import { downloadBlob, exportBackupZip, exportDraftMarkdown, importFiles, safeFileName } from './exchange';
-import { renderLongImage } from './longimage';
-import { SAMPLE_MARKDOWN } from './sample';
-import { getDensity, getTheme } from './theme';
-import { deleteImage, getAllImages, putImage } from './imagedb';
-import { createScrollSyncChannel } from './scrollSync';
+  downloadBlob,
+  exportBackupZip,
+  exportDraftMarkdown,
+  importFiles,
+  safeFileName,
+} from '@/core/transfer/exchange';
+import { renderLongImage } from '@/core/transfer/longimage';
+import { getDensity, getTheme } from '@/core/theme/theme';
+import { deleteImage, getAllImages, putImage } from '@/core/image/imagedb';
+import { createScrollSyncChannel } from '@/core/editor/scrollSync';
+import { locateImage } from '@/core/drafts/locate';
+import { initDraftState, rememberActiveDraft, saveDrafts } from '@/core/drafts/storage';
+import type { Draft } from '@/core/drafts/types';
+import { readStored, writeStored } from '@/core/storage';
 import './styles.css';
-
-/** localStorage / IndexedDB 命名空间：稿域 AnyDraft */
-const NS = 'anydraft';
-/** 更名前使用的命名空间：只作为读取兜底，写入一律用新命名空间 */
-const LEGACY_NS = 'wechat-mp-editor';
-
-const STORAGE_KEY = `${NS}:md`;
-const STORAGE_THEME = `${NS}:theme`;
-const STORAGE_DENSITY = `${NS}:density`;
-const STORAGE_DRAFTS = `${NS}:drafts`;
-const STORAGE_ACTIVE_DRAFT = `${NS}:active-draft`;
-/** 旧版图片注册表存放位置（localStorage），仅用于一次性迁移 */
-const STORAGE_IMAGES = `${NS}:imgs`;
-
-/** 读取偏好值：优先新命名空间，回落更名前写入的同名 key */
-function readStored(key: string): string | null {
-  return localStorage.getItem(key) ?? localStorage.getItem(`${LEGACY_NS}${key.slice(NS.length)}`);
-}
 
 /** 编辑器侧最小宽度（拖拽时保留，预览因此可达 desktop 宽度） */
 const MIN_EDITOR_PX = 180;
 /** 预览最小宽度（容纳真实手机宽度） */
 const MIN_PREVIEW_PX = 430;
-
-interface Draft {
-  id: string;
-  name: string;
-  content: string;
-  updatedAt: number;
-}
-
-/** 读草稿列表（localStorage） */
-function loadDrafts(): Draft[] {
-  try {
-    const raw = readStored(STORAGE_DRAFTS);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Draft[];
-      if (Array.isArray(parsed) && parsed.length) return parsed;
-    }
-  } catch {
-    // 损坏则重建
-  }
-  return [];
-}
-
-/** 迁移旧单草稿：首次使用多草稿时把旧内容变成第一篇草稿 */
-function migrateLegacy(): Draft[] {
-  const legacy = readStored(STORAGE_KEY);
-  const initial: Draft = {
-    id: `draft-${Date.now()}`,
-    name: '未命名草稿',
-    content: legacy != null ? legacy : SAMPLE_MARKDOWN,
-    updatedAt: Date.now(),
-  };
-  const drafts = [initial];
-  try {
-    localStorage.setItem(STORAGE_DRAFTS, JSON.stringify(drafts));
-    localStorage.setItem(STORAGE_ACTIVE_DRAFT, initial.id);
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // 存储失败不影响内存使用
-  }
-  return drafts;
-}
-
-/** 找出正文里第一处引用该图片的行号（0-based），没有则返回 -1 */
-function findEmbedLine(content: string, name: string): number {
-  const lines = content.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lineReferencesImage(lines[i], name)) return i;
-  }
-  return -1;
-}
-
-/** 启动初始化：草稿列表（必要时迁移旧数据）与选中项一次算完，localStorage 只解析一次 */
-function initDraftState(): { drafts: Draft[]; activeId: string } {
-  const existing = loadDrafts();
-  const list = existing.length ? existing : migrateLegacy();
-  const saved = readStored(STORAGE_ACTIVE_DRAFT);
-  const activeId = saved && list.some((d) => d.id === saved) ? saved : list[0]?.id ?? '';
-  return { drafts: list, activeId };
-}
 
 export default function App() {
   const [initial] = useState(initDraftState);
@@ -117,12 +43,12 @@ export default function App() {
   };
   const setActiveDraft = (id: string) => {
     setActiveDraftId(id);
-    localStorage.setItem(STORAGE_ACTIVE_DRAFT, id);
+    rememberActiveDraft(id);
   };
   // 图片注册表存 IndexedDB（容量大），挂载后异步加载到内存供同步渲染
   const [images, setImages] = useState<Record<string, string>>({});
-  const [themeId, setThemeId] = useState<string>(() => readStored(STORAGE_THEME) ?? 'classic');
-  const [densityId, setDensityId] = useState<string>(() => readStored(STORAGE_DENSITY) ?? 'standard');
+  const [themeId, setThemeId] = useState<string>(() => readStored('theme') ?? 'classic');
+  const [densityId, setDensityId] = useState<string>(() => readStored('density') ?? 'standard');
   const [status, setStatus] = useState<string | null>(null);
   /** 导出进行中（长图 / 备份包都要跑一会儿） */
   const [exporting, setExporting] = useState(false);
@@ -176,23 +102,10 @@ export default function App() {
     [],
   );
 
-  // 挂载时：迁移旧 localStorage 图片 → IndexedDB，再加载全部图片
+  // 挂载时：加载全部图片
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const legacy = readStored(STORAGE_IMAGES);
-        if (legacy) {
-          const legacyMap = JSON.parse(legacy) as Record<string, string>;
-          for (const [name, dataUrl] of Object.entries(legacyMap)) {
-            await putImage(name, dataUrl);
-          }
-          localStorage.removeItem(STORAGE_IMAGES);
-        }
-      } catch {
-        // 迁移失败不影响后续加载
-      }
-      if (cancelled) return;
       try {
         const all = await getAllImages();
         if (!cancelled) setImages(all);
@@ -208,8 +121,7 @@ export default function App() {
   // 防抖自动保存草稿（多草稿列表）
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const ok = saveDraftsSafe();
-      if (!ok) flash('草稿过大，本地保存失败');
+      if (!saveDrafts(drafts)) flash('草稿过大，本地保存失败');
     }, 300);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,21 +129,11 @@ export default function App() {
 
   // 记住主题与密度
   useEffect(() => {
-    localStorage.setItem(STORAGE_THEME, theme.id);
+    writeStored('theme', theme.id);
   }, [theme.id]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_DENSITY, densityId);
+    writeStored('density', densityId);
   }, [densityId]);
-
-  /** 安全保存草稿列表，返回是否成功 */
-  const saveDraftsSafe = (): boolean => {
-    try {
-      localStorage.setItem(STORAGE_DRAFTS, JSON.stringify(drafts));
-      return true;
-    } catch {
-      return false;
-    }
-  };
 
   /** 新建草稿 */
   const handleNewDraft = () => {
@@ -279,31 +181,17 @@ export default function App() {
 
   /** 点击图片：定位到引用它的那一行（必要时先切到对应草稿） */
   const handleLocateImage = (name: string) => {
-    const inActive = activeDraft ? findEmbedLine(activeDraft.content, name) : -1;
-    let line = inActive;
-    let jumpedTo: Draft | null = null;
-    if (line < 0) {
-      // 当前草稿里没有，再找其它草稿
-      for (const d of drafts) {
-        if (d.id === activeId) continue;
-        const l = findEmbedLine(d.content, name);
-        if (l >= 0) {
-          line = l;
-          jumpedTo = d;
-          break;
-        }
-      }
-    }
-    if (line < 0) {
+    const hit = locateImage(drafts, activeId, name);
+    if (!hit) {
       flash(`「${name}」还没有被任何草稿引用`);
       return;
     }
-    if (jumpedTo) {
-      setActiveDraft(jumpedTo.id);
-      flash(`已跳到「${jumpedTo.name}」`);
+    if (hit.draft.id !== activeId) {
+      setActiveDraft(hit.draft.id);
+      flash(`已跳到「${hit.draft.name}」`);
     }
     jumpNonce.current += 1;
-    setJumpRequest({ line, nonce: jumpNonce.current });
+    setJumpRequest({ line: hit.line, nonce: jumpNonce.current });
   };
 
   /** 删除单张图片；仍被引用时先确认（删掉后正文会退回占位提示） */

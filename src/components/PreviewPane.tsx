@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BatteryFull, Signal, Wifi } from 'lucide-react';
-import { extractTitle, stripFirstH1 } from '../markdown';
-import type { ScrollSyncChannel } from '../scrollSync';
-import type { Theme } from '../theme';
+import { extractTitle, stripFirstH1 } from '@/core/markdown/markdown';
+import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
+import type { Theme } from '@/core/theme/theme';
 
 interface Props {
   body: string;
@@ -57,11 +57,9 @@ const DEVICES: { id: PreviewDevice; name: string; hint: string }[] = [
 
 /** Per browser, like the theme choice: it is how you like to look, not part of the draft */
 const STORAGE_DEVICE = 'anydraft:preview-device';
-/** 更名前写入的同名 key，作为读取兜底 */
-const LEGACY_STORAGE_DEVICE = 'wechat-mp-editor:preview-device';
 
 function readDevice(): PreviewDevice {
-  const v = localStorage.getItem(STORAGE_DEVICE) ?? localStorage.getItem(LEGACY_STORAGE_DEVICE);
+  const v = localStorage.getItem(STORAGE_DEVICE);
   return DEVICES.find((d) => d.id === v)?.id ?? 'iphone';
 }
 

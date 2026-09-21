@@ -7,8 +7,8 @@
  * `<img>` / `<br>` 这类空元素并转义属性，手写字符串拼接做不到这一点。
  */
 
-import { extractTitle, stripFirstH1 } from './markdown';
-import { st, type Theme } from './theme';
+import { extractTitle, stripFirstH1 } from '@/core/markdown/markdown';
+import { st, type Theme } from '@/core/theme/theme';
 
 /** 版面宽度（CSS px）：按手机正文宽度排版，导出时再放大 */
 const WIDTH = 375;

@@ -10,13 +10,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-
-export interface Draft {
-  id: string;
-  name: string;
-  content: string;
-  updatedAt: number;
-}
+import type { Draft } from '@/core/drafts/types';
 
 interface Props {
   drafts: Draft[];
