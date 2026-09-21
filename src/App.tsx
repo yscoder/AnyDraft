@@ -2,7 +2,6 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import EditorPane from './components/EditorPane';
 import FileTree from './components/FileTree';
 import PreviewPane from './components/PreviewPane';
-import ThemeRail from './components/ThemeRail';
 import Toolbar from './components/Toolbar';
 import {
   collectImageRefs,
@@ -496,14 +495,12 @@ export default function App() {
         onExportBackup={() => void handleExportBackup()}
         onExportImage={() => void handleExportImage()}
         exporting={exporting}
+        themeId={themeId}
+        onThemeChange={setThemeId}
+        densityId={densityId}
+        onDensityChange={setDensityId}
       />
       <main className={`workspace ${isPreviewOnly ? 'mode-preview' : ''}`}>
-        <ThemeRail
-          themeId={themeId}
-          onThemeChange={setThemeId}
-          densityId={densityId}
-          onDensityChange={setDensityId}
-        />
         <FileTree
           drafts={drafts}
           activeId={activeId}

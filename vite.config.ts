@@ -1,3 +1,5 @@
+import path from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -10,7 +12,7 @@ import react from '@vitejs/plugin-react';
 const VENDOR_GROUPS: Record<string, string[]> = {
   react: ['react', 'react-dom', 'scheduler'],
   // 图标集几乎不随业务改动，单独成块常驻缓存
-  icons: ['@phosphor-icons/react'],
+  icons: ['lucide-react'],
   codemirror: [
     '@codemirror/state',
     '@codemirror/view',
@@ -51,7 +53,12 @@ function vendorChunk(id: string): string | undefined {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   base: './',
   build: {
     // 语法高亮与编辑器语法包都已按需加载，剩下的主包应远低于该阈值

@@ -1,5 +1,23 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowCounterClockwise, Code, CodeBlock, Link, ListBullets, ListChecks, ListDashes, Minus, Quotes, Table, TextB, TextH, TextHFour, TextHOne, TextHThree, TextHTwo, TextItalic } from '@phosphor-icons/react';
+import {
+  Bold,
+  Code,
+  FileCode2,
+  Heading,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
+  Italic,
+  Link,
+  List,
+  ListChecks,
+  ListTree,
+  Minus,
+  Quote,
+  Table,
+  Undo2,
+} from 'lucide-react';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap, indentWithTab, undo } from '@codemirror/commands';
@@ -10,9 +28,9 @@ import { languages } from '@codemirror/language-data';
 import { registerImageFiles } from '../images';
 import type { ScrollSyncChannel } from '../scrollSync';
 
-/* Phosphor 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
+/* Lucide 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
 const ICON = 16;
-const HEADING_ICON = { 1: TextHOne, 2: TextHTwo, 3: TextHThree, 4: TextHFour } as const;
+const HEADING_ICON = { 1: Heading1, 2: Heading2, 3: Heading3, 4: Heading4 } as const;
 
 interface Props {
   value: string;
@@ -136,7 +154,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             },
             '.cm-content': {
               padding: '20px 22px 20px 24px',
-              caretColor: '#d97757',
+              caretColor: 'var(--foreground)',
             },
             '.cm-line': { padding: '0' },
             '.cm-gutters': {
@@ -149,7 +167,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             },
             '.cm-activeLineGutter': { background: 'transparent' },
             '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-              background: 'rgba(217,119,87,0.2)',
+              background: 'color-mix(in oklch, var(--foreground) 14%, transparent)',
             },
             '&.cm-focused': { outline: 'none' },
             '.cm-activeLine': { background: 'transparent' },
@@ -379,17 +397,17 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   ];
 
   const toolbarBtns: { key: string; title: string; icon: React.ReactNode; onClick: () => void }[] = [
-    { key: 'bold', title: '加粗', icon: <TextB size={ICON} />, onClick: () => wrapSelection('**', '**') },
-    { key: 'italic', title: '斜体', icon: <TextItalic size={ICON} />, onClick: () => wrapSelection('*', '*') },
+    { key: 'bold', title: '加粗', icon: <Bold size={ICON} />, onClick: () => wrapSelection('**', '**') },
+    { key: 'italic', title: '斜体', icon: <Italic size={ICON} />, onClick: () => wrapSelection('*', '*') },
     { key: 'code', title: '行内代码', icon: <Code size={ICON} />, onClick: () => wrapSelection('`', '`') },
-    { key: 'quote', title: '引用', icon: <Quotes size={ICON} />, onClick: () => prefixLine('> ') },
-    { key: 'list', title: '无序列表', icon: <ListBullets size={ICON} />, onClick: () => prefixLine('- ') },
+    { key: 'quote', title: '引用', icon: <Quote size={ICON} />, onClick: () => prefixLine('> ') },
+    { key: 'list', title: '无序列表', icon: <List size={ICON} />, onClick: () => prefixLine('- ') },
     { key: 'task', title: '待办事项', icon: <ListChecks size={ICON} />, onClick: () => prefixLine('- [ ] ') },
-    { key: 'fence', title: '代码块', icon: <CodeBlock size={ICON} />, onClick: () => insertBlock('\n```ts\n\n```\n') },
+    { key: 'fence', title: '代码块', icon: <FileCode2 size={ICON} />, onClick: () => insertBlock('\n```ts\n\n```\n') },
     { key: 'table', title: '表格', icon: <Table size={ICON} />, onClick: insertTable },
     { key: 'link', title: '链接', icon: <Link size={ICON} />, onClick: () => wrapSelection('[', '](https://)') },
     { key: 'hr', title: '分割线', icon: <Minus size={ICON} />, onClick: () => insertBlock('\n---\n') },
-    { key: 'undo', title: '撤销', icon: <ArrowCounterClockwise size={ICON} />, onClick: undoEdit },
+    { key: 'undo', title: '撤销', icon: <Undo2 size={ICON} />, onClick: undoEdit },
   ];
 
   return (
@@ -397,6 +415,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       ref={ref}
       className={`split-pane editor-side ${collapsed ? 'collapsed' : ''}`}
       style={{ width: `${widthPct}%` }}
+      aria-hidden={collapsed}
+      inert={collapsed}
     >
       <div className="pane-head">
         <span className="pane-title">
@@ -410,7 +430,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             aria-expanded={outlineOpen}
             onClick={() => setOutlineOpen((v) => !v)}
           >
-            <ListDashes size={15} />
+            <ListTree size={15} />
           </button>
           <span className="pane-stat">{saved ? '已保存' : '保存中'}</span>
           <span
@@ -454,7 +474,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
               setHeadingOpen((v) => !v);
             }}
           >
-            <TextH size={ICON} />
+            <Heading size={ICON} />
           </button>
           {headingOpen && (
             <div className="md-toolbar-menu" role="menu">

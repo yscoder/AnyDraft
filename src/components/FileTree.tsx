@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Broom,
-  CaretDown,
-  CaretRight,
-  FileMd,
+  ChevronDown,
+  ChevronRight,
+  Eraser,
+  FileText,
   FilePlus,
   FolderOpen,
   Image,
-  PencilSimple,
-  Trash,
-} from '@phosphor-icons/react';
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 
 export interface Draft {
   id: string;
@@ -121,7 +121,7 @@ export default function FileTree({
         {/* ---- 草稿 ---- */}
         <div className="tree-group" role="treeitem" aria-expanded={draftsOpen}>
           <button className="tree-folder" onClick={() => setDraftsOpen((v) => !v)}>
-            {draftsOpen ? <CaretDown size={11} weight="bold" /> : <CaretRight size={11} weight="bold" />}
+            {draftsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             <FolderOpen size={14} />
             <span className="tree-folder-name">草稿</span>
             <span className="tree-count">{drafts.length}</span>
@@ -134,7 +134,7 @@ export default function FileTree({
                 if (renamingId === d.id) {
                   return (
                     <div key={d.id} className="tree-file renaming">
-                      <FileMd size={14} />
+                      <FileText size={14} />
                       <input
                         ref={renameInputRef}
                         className="tree-rename-input"
@@ -157,7 +157,7 @@ export default function FileTree({
                     aria-selected={active}
                   >
                     <button className="tree-file-main" onClick={() => onSelect(d.id)} title={d.name}>
-                      <FileMd size={14} />
+                      <FileText size={14} />
                       <span className="tree-file-text">
                         <span className="tree-file-name">{d.name}</span>
                         <span className="tree-file-meta">
@@ -174,10 +174,10 @@ export default function FileTree({
                           setRenameValue(d.name);
                         }}
                       >
-                        <PencilSimple size={12} />
+                        <Pencil size={12} />
                       </button>
                       <button title="删除" aria-label={`删除 ${d.name}`} onClick={() => onDelete(d.id)}>
-                        <Trash size={12} />
+                        <Trash2 size={12} />
                       </button>
                     </span>
                   </div>
@@ -190,7 +190,7 @@ export default function FileTree({
         {/* ---- 图片库 ---- */}
         <div className="tree-group" role="treeitem" aria-expanded={imagesOpen}>
           <button className="tree-folder" onClick={() => setImagesOpen((v) => !v)}>
-            {imagesOpen ? <CaretDown size={11} weight="bold" /> : <CaretRight size={11} weight="bold" />}
+            {imagesOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             <Image size={14} />
             <span className="tree-folder-name">图片</span>
             {totalBytes > 0 && <span className="tree-size">{formatBytes(totalBytes)}</span>}
@@ -225,14 +225,14 @@ export default function FileTree({
                           aria-label={`删除图片 ${img.name}`}
                           onClick={() => onDeleteImage(img.name)}
                         >
-                          <Trash size={12} />
+                          <Trash2 size={12} />
                         </button>
                       </span>
                     </div>
                   ))}
                   {unusedCount > 0 && (
                     <button className="tree-cleanup" onClick={onCleanupImages}>
-                      <Broom size={13} />
+                      <Eraser size={13} />
                       清理 {unusedCount} 张未引用
                     </button>
                   )}

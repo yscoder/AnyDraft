@@ -32,7 +32,7 @@ Markdown 写作，一键转成**内联样式**富文本，粘贴到微信公众�
 
 ## 技术栈
 
-React 19 · TypeScript · Vite 7 · CodeMirror 6 · markdown-it · highlight.js
+React 19 · TypeScript 7 · Vite 7 · Tailwind CSS 4 · shadcn/ui（Maia / neutral）· Radix UI · Lucide · CodeMirror 6 · markdown-it · highlight.js
 
 ## 开发
 

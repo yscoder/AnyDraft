@@ -1,13 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
   Archive,
-  CaretDown,
-  ClipboardText,
-  DownloadSimple,
-  FileMd,
-  ImageSquare,
-  UploadSimple,
-} from '@phosphor-icons/react';
+  ChevronDown,
+  Clipboard,
+  Download,
+  FileText,
+  ImageIcon,
+  Upload,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import ThemeControls from './ThemeControls';
 
 interface Props {
   viewMode: 'split' | 'preview';
@@ -24,6 +34,10 @@ interface Props {
   onExportImage: () => void;
   /** 导出进行中：禁用菜单，避免重复触发 */
   exporting: boolean;
+  themeId: string;
+  onThemeChange: (id: string) => void;
+  densityId: string;
+  onDensityChange: (id: string) => void;
 }
 
 export default function Toolbar({
@@ -36,32 +50,12 @@ export default function Toolbar({
   onExportBackup,
   onExportImage,
   exporting,
+  themeId,
+  onThemeChange,
+  densityId,
+  onDensityChange,
 }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // 点击菜单外 / Esc 关闭
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('click', onDocClick);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('click', onDocClick);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [menuOpen]);
-
-  const runExport = (fn: () => void) => {
-    setMenuOpen(false);
-    fn();
-  };
 
   return (
     <header className="toolbar">
@@ -72,21 +66,27 @@ export default function Toolbar({
       </div>
 
       {/* 对照 / 预览 */}
-      <div className="segmented" role="tablist" aria-label="工作区模式">
-        {(['split', 'preview'] as const).map((m) => (
-          <button
-            key={m}
-            role="tab"
-            aria-selected={viewMode === m}
-            className={`seg-btn ${viewMode === m ? 'active' : ''}`}
-            onClick={() => onViewMode(m)}
-          >
-            {m === 'split' ? '对照' : '预览'}
-          </button>
-        ))}
-      </div>
+      <ToggleGroup
+        type="single"
+        value={viewMode}
+        variant="outline"
+        size="sm"
+        spacing={0}
+        aria-label="工作区模式"
+        onValueChange={(value) => value && onViewMode(value as 'split' | 'preview')}
+      >
+        <ToggleGroupItem value="split" aria-label="对照模式">对照</ToggleGroupItem>
+        <ToggleGroupItem value="preview" aria-label="预览模式">预览</ToggleGroupItem>
+      </ToggleGroup>
 
       <div className="toolbar-right">
+        <ThemeControls
+          themeId={themeId}
+          onThemeChange={onThemeChange}
+          densityId={densityId}
+          onDensityChange={onDensityChange}
+        />
+
         {/* 导入：.md 各建一篇草稿，.zip 按备份包整体还原 */}
         <input
           ref={fileRef}
@@ -100,47 +100,41 @@ export default function Toolbar({
             e.target.value = ''; // 同一文件连选两次也要触发
           }}
         />
-        <button className="btn" onClick={() => fileRef.current?.click()} title="导入 Markdown 文件或备份包">
-          <UploadSimple size={15} weight="bold" />
+        <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} title="导入 Markdown 文件或备份包">
+          <Upload data-icon="inline-start" />
           导入
-        </button>
+        </Button>
 
-        <div className="menu-wrap" ref={menuRef}>
-          <button
-            className="btn"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            disabled={exporting}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <DownloadSimple size={15} weight="bold" />
-            {exporting ? '导出中…' : '导出'}
-            <CaretDown size={11} weight="bold" />
-          </button>
-          {menuOpen && (
-            <div className="dropdown-menu" role="menu">
-              <button role="menuitem" onClick={() => runExport(onExportMarkdown)}>
-                <FileMd size={16} className="menu-icon" />
-                当前草稿 .md
-              </button>
-              <button role="menuitem" onClick={() => runExport(onExportImage)}>
-                <ImageSquare size={16} className="menu-icon" />
-                正文长图 .png
-              </button>
-              <div className="dropdown-divider" />
-              <button role="menuitem" onClick={() => runExport(onExportBackup)}>
-                <Archive size={16} className="menu-icon" />
-                全部备份 .zip
-                <span className="menu-hint">草稿 + 图片</span>
-              </button>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" disabled={exporting}>
+              <Download data-icon="inline-start" />
+              {exporting ? '导出中…' : '导出'}
+              <ChevronDown data-icon="inline-end" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-52">
+            <DropdownMenuItem onSelect={onExportMarkdown}>
+              <FileText />
+              当前草稿 .md
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onExportImage}>
+              <ImageIcon />
+              正文长图 .png
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onExportBackup}>
+              <Archive />
+              全部备份 .zip
+              <span className="ml-auto text-xs text-muted-foreground">草稿 + 图片</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <button className="btn primary" onClick={onCopy}>
-          <ClipboardText size={15} weight="bold" />
+        <Button size="sm" onClick={onCopy}>
+          <Clipboard data-icon="inline-start" />
           复制到公众号
-        </button>
+        </Button>
 
         {status && <span className="status show">{status}</span>}
       </div>

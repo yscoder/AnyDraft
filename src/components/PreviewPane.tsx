@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BatteryFull, CellSignalFull, WifiHigh } from '@phosphor-icons/react';
+import { BatteryFull, Signal, Wifi } from 'lucide-react';
 import { extractTitle, stripFirstH1 } from '../markdown';
 import type { ScrollSyncChannel } from '../scrollSync';
 import type { Theme } from '../theme';
@@ -394,9 +394,9 @@ export default function PreviewPane({ body, theme, hasImage, resizeKey, sync }: 
               <span className="time">9:41</span>
               <span className="dynamic-island" aria-hidden="true"></span>
               <span className="sb-icons" aria-hidden="true">
-                <CellSignalFull size={13} weight="fill" />
-                <WifiHigh size={13} weight="bold" />
-                <BatteryFull size={17} weight="fill" />
+                <Signal size={13} fill="currentColor" />
+                <Wifi size={13} />
+                <BatteryFull size={17} fill="currentColor" />
               </span>
               <svg className="sb-orb" viewBox="0 0 32 32" aria-hidden="true">
                 {/* Circle outline over the top and down both sides, to just below the middle */}
