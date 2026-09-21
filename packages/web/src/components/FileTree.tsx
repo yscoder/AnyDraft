@@ -11,6 +11,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Draft } from '@any-draft/shared';
+import {Button} from './ui/button'
+import { TooltipHint } from '@/components/ui/tooltip';
 
 interface Props {
   drafts: Draft[];
@@ -105,10 +107,12 @@ export default function FileTree({
   return (
     <nav className="file-tree" aria-label="文件">
       <div className="tree-head">
-        <span className="tree-head-label">文件</span>
-        <button className="tree-new" title="新建草稿" aria-label="新建草稿" onClick={onNew}>
-          <FilePlus size={14} />
-        </button>
+        <span className="tree-head-label font-semibold">文件</span>
+        <TooltipHint content="新建草稿">
+          <Button variant="ghost" size="icon-sm" className='rounded-sm!' aria-label="新建草稿" onClick={onNew}>
+            <FilePlus />
+          </Button>
+        </TooltipHint>
       </div>
 
       <div className="tree-body" role="tree" aria-label="文件">
@@ -150,7 +154,7 @@ export default function FileTree({
                     role="treeitem"
                     aria-selected={active}
                   >
-                    <button className="tree-file-main" onClick={() => onSelect(d.id)} title={d.name}>
+                    <button className="tree-file-main" onClick={() => onSelect(d.id)}>
                       <FileText size={14} />
                       <span className="tree-file-text">
                         <span className="tree-file-name">{d.name}</span>
@@ -160,19 +164,22 @@ export default function FileTree({
                       </span>
                     </button>
                     <span className="tree-file-actions">
-                      <button
-                        title="重命名"
-                        aria-label={`重命名 ${d.name}`}
-                        onClick={() => {
-                          setRenamingId(d.id);
-                          setRenameValue(d.name);
-                        }}
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button title="删除" aria-label={`删除 ${d.name}`} onClick={() => onDelete(d.id)}>
-                        <Trash2 size={12} />
-                      </button>
+                      <TooltipHint content="重命名">
+                        <button
+                          aria-label={`重命名 ${d.name}`}
+                          onClick={() => {
+                            setRenamingId(d.id);
+                            setRenameValue(d.name);
+                          }}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </TooltipHint>
+                      <TooltipHint content="删除">
+                        <button aria-label={`删除 ${d.name}`} onClick={() => onDelete(d.id)}>
+                          <Trash2 size={12} />
+                        </button>
+                      </TooltipHint>
                     </span>
                   </div>
                 );
@@ -199,28 +206,30 @@ export default function FileTree({
                 <>
                   {imageList.map((img) => (
                     <div key={img.name} className={`tree-file ${img.used ? '' : 'unused'}`} role="treeitem">
-                      <button
-                        className="tree-file-main"
-                        title={img.used ? `${img.name} — 点击定位到正文` : `${img.name} — 未被任何草稿引用`}
-                        onClick={() => onLocateImage(img.name)}
+                      <TooltipHint
+                        content={img.used ? `${img.name} — 点击定位到正文` : `${img.name} — 未被任何草稿引用`}
+                        side="right"
                       >
-                        <Image size={14} />
-                        <span className="tree-file-text">
-                          <span className="tree-file-name">{img.name}</span>
-                          <span className="tree-file-meta">
-                            {formatBytes(img.bytes)}
-                            {img.used ? '' : ' · 未引用'}
+                        <button className="tree-file-main" onClick={() => onLocateImage(img.name)}>
+                          <Image size={14} />
+                          <span className="tree-file-text">
+                            <span className="tree-file-name">{img.name}</span>
+                            <span className="tree-file-meta">
+                              {formatBytes(img.bytes)}
+                              {img.used ? '' : ' · 未引用'}
+                            </span>
                           </span>
-                        </span>
-                      </button>
-                      <span className="tree-file-actions">
-                        <button
-                          title="删除图片"
-                          aria-label={`删除图片 ${img.name}`}
-                          onClick={() => onDeleteImage(img.name)}
-                        >
-                          <Trash2 size={12} />
                         </button>
+                      </TooltipHint>
+                      <span className="tree-file-actions">
+                        <TooltipHint content="删除图片">
+                          <button
+                            aria-label={`删除图片 ${img.name}`}
+                            onClick={() => onDeleteImage(img.name)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </TooltipHint>
                       </span>
                     </div>
                   ))}

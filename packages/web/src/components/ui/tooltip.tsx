@@ -53,4 +53,26 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }
+function TooltipHint({
+  children,
+  content,
+  side = "top",
+  sideOffset = 6,
+  ...props
+}: Omit<React.ComponentProps<typeof TooltipContent>, "children"> & {
+  children: React.ReactElement
+  content?: React.ReactNode
+}) {
+  if (!content) return children
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side} sideOffset={sideOffset} {...props}>
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+export { Tooltip, TooltipContent, TooltipHint, TooltipProvider, TooltipTrigger }

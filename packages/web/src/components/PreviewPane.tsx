@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BatteryFull, Signal, Wifi } from 'lucide-react';
+import { TooltipHint } from '@/components/ui/tooltip';
 import { extractTitle, stripFirstH1 } from '@/core/markdown/markdown';
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
 import type { Theme } from '@/core/theme/theme';
@@ -7,8 +8,6 @@ import type { Theme } from '@/core/theme/theme';
 interface Props {
   body: string;
   theme: Theme;
-  /** Whether the body contains images (shows the WeChat paste notice) */
-  hasImage: boolean;
   /**
    * Layout-change signal (editor width and mode switching both change it):
    * a backstop for the ResizeObserver — dragging the splitter or switching
@@ -165,7 +164,7 @@ function buildAnchors(scroll: HTMLElement): Anchor[] {
  * Every style in the body HTML is inline ⇒ preview and export (the WeChat
  * paste) are identical.
  */
-export default function PreviewPane({ body, theme, hasImage, resizeKey, sync }: Props) {
+export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
   const paneRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -324,24 +323,20 @@ export default function PreviewPane({ body, theme, hasImage, resizeKey, sync }: 
       // theme gets the Night Sky Duo and a light one Star White
       data-appearance={theme.appearance}
     >
-      <div className="pane-head">
-        <span className="pane-title">预览</span>
-        <div className="pane-head-right">
-          {hasImage && <span className="pane-stat warn">含图片 · 建议公众号内单独上传</span>}
-          <div className="segmented device-switch" role="radiogroup" aria-label="预览机型">
-            {DEVICES.map((d) => (
+      <div className="preview-toolbar">
+        <div className="segmented device-switch" role="radiogroup" aria-label="预览机型">
+          {DEVICES.map((d) => (
+            <TooltipHint key={d.id} content={d.hint}>
               <button
-                key={d.id}
                 role="radio"
                 aria-checked={device === d.id}
                 className={`seg-btn ${device === d.id ? 'active' : ''}`}
-                title={d.hint}
                 onClick={() => setDevice(d.id)}
               >
                 {d.name}
               </button>
-            ))}
-          </div>
+            </TooltipHint>
+          ))}
         </div>
       </div>
       <div className="phone-stage" ref={stageRef}>
@@ -431,15 +426,6 @@ export default function PreviewPane({ body, theme, hasImage, resizeKey, sync }: 
                 ref={bodyRef}
                 dangerouslySetInnerHTML={{ __html: previewBody }}
               />
-              {/* Article footer: share / save / recommend / like, at the end of the content */}
-              <div className="article-footer">
-                <div className="actions">
-                  <button className="action">分享</button>
-                  <button className="action">收藏</button>
-                  <button className="action">在看</button>
-                  <button className="action">点赞</button>
-                </div>
-              </div>
             </div>
             {/* The fold down the middle of the Duo's inner screen */}
             <span className="crease" aria-hidden="true"></span>

@@ -2,7 +2,33 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import EditorPane from '@/components/EditorPane';
 import FileTree from '@/components/FileTree';
 import PreviewPane from '@/components/PreviewPane';
+import ThemeControls from '@/components/ThemeControls';
 import Toolbar from '@/components/Toolbar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarInset,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { TooltipHint } from '@/components/ui/tooltip';
+import { ListTree } from 'lucide-react';
+import type { PanelImperativeHandle } from 'react-resizable-panels';
+import { toast } from 'sonner';
 import { collectImageRefs, ensureHighlighter, isHighlighterReady, renderArticle } from '@/core/markdown/markdown';
 import { copyRichText } from '@/core/transfer/clipboard';
 import {
@@ -26,6 +52,15 @@ import './styles.css';
 const MIN_EDITOR_PX = 180;
 /** 预览最小宽度（容纳真实手机宽度） */
 const MIN_PREVIEW_PX = 430;
+const MIN_EDITOR_HEIGHT_PX = 160;
+const MIN_PREVIEW_HEIGHT_PX = 220;
+
+interface Confirmation {
+  title: string;
+  description: string;
+  actionLabel: string;
+  onConfirm: () => void;
+}
 
 export default function App() {
   const [initial] = useState(initDraftState);
@@ -49,20 +84,16 @@ export default function App() {
   const [images, setImages] = useState<Record<string, string>>({});
   const [themeId, setThemeId] = useState<string>(() => readStored('theme') ?? 'classic');
   const [densityId, setDensityId] = useState<string>(() => readStored('density') ?? 'standard');
-  const [status, setStatus] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   /** 导出进行中（长图 / 备份包都要跑一会儿） */
   const [exporting, setExporting] = useState(false);
   /** 对照 / 预览模式 */
   const [viewMode, setViewMode] = useState<'split' | 'preview'>('split');
-  /** 编辑器侧宽度（百分比，默认预览最小宽度） */
-  const [editorPct, setEditorPct] = useState<number>(() => {
-    const w = window.innerWidth;
-    return Math.round(((w - MIN_PREVIEW_PX) / w) * 1000) / 10;
-  });
-  /** 拖拽中禁用宽度过渡 */
-  const draggingRef = useRef(false);
-  const splitRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<HTMLElement>(null);
+  const isPreviewOnly = viewMode === 'preview';
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [saved, setSaved] = useState(true);
+  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  const editorPanelRef = useRef<PanelImperativeHandle>(null);
 
   const theme = useMemo(() => getTheme(themeId), [themeId]);
   const density = useMemo(() => getDensity(densityId), [densityId]);
@@ -76,6 +107,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [deferredMarkdown, theme, images, density, hlReady],
   );
+  const charCount = useMemo(() => markdown.replace(/\s/g, '').length, [markdown]);
+  /** 微信正文上限 2 万字：18000 预警、20000 红线 */
+  const countLevel = charCount >= 20000 ? 'over' : charCount >= 18000 ? 'warn' : 'normal';
+  const countClass = `pane-stat count ${countLevel === 'warn' ? 'count-warn' : countLevel === 'over' ? 'count-over' : ''}`;
 
   // highlight.js 懒加载（不阻塞首屏），就绪后补上代码高亮
   useEffect(() => {
@@ -89,18 +124,9 @@ export default function App() {
     };
   }, [hlReady]);
 
-  const statusTimer = useRef<number | null>(null);
-  const flash = (msg: string) => {
-    setStatus(msg);
-    if (statusTimer.current) window.clearTimeout(statusTimer.current);
-    statusTimer.current = window.setTimeout(() => setStatus(null), 2200);
+  const flash = (msg: string, kind: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    toast[kind](msg);
   };
-  useEffect(
-    () => () => {
-      if (statusTimer.current) window.clearTimeout(statusTimer.current);
-    },
-    [],
-  );
 
   // 挂载时：加载全部图片
   useEffect(() => {
@@ -110,7 +136,7 @@ export default function App() {
         const all = await getAllImages();
         if (!cancelled) setImages(all);
       } catch {
-        if (!cancelled) flash('图片库加载失败');
+        if (!cancelled) flash('图片库加载失败', 'error');
       }
     })();
     return () => {
@@ -121,11 +147,18 @@ export default function App() {
   // 防抖自动保存草稿（多草稿列表）
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (!saveDrafts(drafts)) flash('草稿过大，本地保存失败');
+      if (!saveDrafts(drafts)) flash('草稿过大，本地保存失败', 'error');
     }, 300);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drafts]);
+
+  // 状态栏中的保存反馈与草稿自动保存节奏保持一致
+  useEffect(() => {
+    setSaved(false);
+    const timer = window.setTimeout(() => setSaved(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [markdown]);
 
   // 记住主题与密度
   useEffect(() => {
@@ -135,13 +168,29 @@ export default function App() {
     writeStored('density', densityId);
   }, [densityId]);
 
+  // 与 CSS 断点保持一致：桌面左右分栏，窄屏上下分栏
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const update = () => setIsNarrow(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  // “预览”模式通过 ResizablePanel 的折叠 API 收起编辑器，返回时恢复原尺寸
+  useEffect(() => {
+    const panel = editorPanelRef.current;
+    if (!panel) return;
+    if (isPreviewOnly) panel.collapse();
+    else panel.expand();
+  }, [isPreviewOnly, isNarrow]);
+
   /** 新建草稿 */
   const handleNewDraft = () => {
     const id = `draft-${Date.now()}`;
     const name = `草稿 ${drafts.length + 1}`;
     setDrafts((prev) => [...prev, { id, name, content: '', updatedAt: Date.now() }]);
     setActiveDraft(id); // 内部已写入 STORAGE_ACTIVE_DRAFT
-    flash(`已新建「${name}」`);
+    flash(`已新建「${name}」`, 'success');
   };
 
   /** 重命名草稿 */
@@ -155,15 +204,21 @@ export default function App() {
   const handleDeleteDraft = (id: string) => {
     const target = drafts.find((d) => d.id === id);
     if (!target) return;
-    if (!window.confirm(`删除草稿「${target.name}」？此操作不可恢复。`)) return;
-    const remaining = drafts.filter((d) => d.id !== id);
-    // 删光了就补一篇空草稿；选中项必须落在新列表里，否则后续编辑会写不进任何草稿
-    const next = remaining.length
-      ? remaining
-      : [{ id: `draft-${Date.now()}`, name: '未命名草稿', content: '', updatedAt: Date.now() }];
-    setDrafts(next);
-    if (id === activeId) setActiveDraft(next[0].id);
-    flash(`已删除「${target.name}」`);
+    setConfirmation({
+      title: '删除草稿？',
+      description: `「${target.name}」将被永久删除，此操作无法撤销。`,
+      actionLabel: '删除草稿',
+      onConfirm: () => {
+        const remaining = drafts.filter((d) => d.id !== id);
+        // 删光了就补一篇空草稿；选中项必须落在新列表里，否则后续编辑会写不进任何草稿
+        const next = remaining.length
+          ? remaining
+          : [{ id: `draft-${Date.now()}`, name: '未命名草稿', content: '', updatedAt: Date.now() }];
+        setDrafts(next);
+        if (id === activeId) setActiveDraft(next[0].id);
+        flash(`已删除「${target.name}」`, 'success');
+      },
+    });
   };
 
   /** 正文里被引用到的图片名（两种语法都算，跨全部草稿） */
@@ -183,12 +238,12 @@ export default function App() {
   const handleLocateImage = (name: string) => {
     const hit = locateImage(drafts, activeId, name);
     if (!hit) {
-      flash(`「${name}」还没有被任何草稿引用`);
+      flash(`「${name}」还没有被任何草稿引用`, 'warning');
       return;
     }
     if (hit.draft.id !== activeId) {
       setActiveDraft(hit.draft.id);
-      flash(`已跳到「${hit.draft.name}」`);
+      flash(`已跳到「${hit.draft.name}」`, 'info');
     }
     jumpNonce.current += 1;
     setJumpRequest({ line: hit.line, nonce: jumpNonce.current });
@@ -196,39 +251,56 @@ export default function App() {
 
   /** 删除单张图片；仍被引用时先确认（删掉后正文会退回占位提示） */
   const handleDeleteImage = (name: string) => {
-    if (usedImageNames.has(name) && !window.confirm(`「${name}」还被正文引用，删除后那里会变成占位提示。仍要删除？`)) {
+    const removeImage = () => {
+      setImages((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+      deleteImage(name).catch(() => flash('图片删除失败', 'error'));
+      flash(`已删除「${name}」`, 'success');
+    };
+
+    if (usedImageNames.has(name)) {
+      setConfirmation({
+        title: '删除仍被引用的图片？',
+        description: `「${name}」仍在正文中使用，删除后对应位置将显示为占位提示。`,
+        actionLabel: '仍要删除',
+        onConfirm: removeImage,
+      });
       return;
     }
-    setImages((prev) => {
-      const next = { ...prev };
-      delete next[name];
-      return next;
-    });
-    deleteImage(name).catch(() => flash('图片删除失败'));
-    flash(`已删除「${name}」`);
+
+    removeImage();
   };
 
   /** 一键清理所有草稿都没引用的图片（长期使用后这些是占用大头） */
   const handleCleanupImages = () => {
     const unused = Object.keys(images).filter((n) => !usedImageNames.has(n));
     if (!unused.length) {
-      flash('没有未引用的图片');
+      flash('没有未引用的图片', 'info');
       return;
     }
-    if (!window.confirm(`删除 ${unused.length} 张未被任何草稿引用的图片？`)) return;
-    setImages((prev) => {
-      const next = { ...prev };
-      for (const n of unused) delete next[n];
-      return next;
+    setConfirmation({
+      title: '清理未引用图片？',
+      description: `将永久删除 ${unused.length} 张未被任何草稿引用的图片，此操作无法撤销。`,
+      actionLabel: `删除 ${unused.length} 张图片`,
+      onConfirm: () => {
+        setImages((prev) => {
+          const next = { ...prev };
+          for (const n of unused) delete next[n];
+          return next;
+        });
+        void Promise.all(unused.map((n) => deleteImage(n))).catch(() => flash('部分图片删除失败', 'warning'));
+        flash(`已清理 ${unused.length} 张未引用图片`, 'success');
+      },
     });
-    void Promise.all(unused.map((n) => deleteImage(n))).catch(() => flash('部分图片删除失败'));
-    flash(`已清理 ${unused.length} 张未引用图片`);
   };
 
   /** 编辑器拖入/粘贴图片后注册到注册表（写 IndexedDB） */
   const handleAddImage = (name: string, dataUrl: string) => {
     setImages((prev) => (prev[name] === dataUrl ? prev : { ...prev, [name]: dataUrl }));
-    putImage(name, dataUrl).catch(() => flash('图片保存失败，存储空间可能已满'));
+    putImage(name, dataUrl).catch(() => flash('图片保存失败，存储空间可能已满', 'error'));
   };
 
   const handleCopy = async () => {
@@ -236,7 +308,10 @@ export default function App() {
     await ensureHighlighter();
     const { html } = renderArticle(markdown, theme, images, density);
     const ok = await copyRichText(html);
-    flash(ok ? '已复制，去公众号 ⌘V 粘贴' : '复制失败，请用浏览器 Chrome/Edge');
+    flash(
+      ok ? '已复制，去公众号 ⌘V 粘贴' : '复制失败，请用浏览器 Chrome/Edge',
+      ok ? 'success' : 'error',
+    );
   };
 
   /* ---------------- 导入 / 导出 ---------------- */
@@ -247,7 +322,7 @@ export default function App() {
       const { drafts: incoming, images: incomingImages, skipped } = await importFiles(files);
       const imageCount = Object.keys(incomingImages).length;
       if (!incoming.length && !imageCount) {
-        flash(skipped.length ? '没有可导入的 Markdown 或备份文件' : '文件是空的');
+        flash(skipped.length ? '没有可导入的 Markdown 或备份文件' : '文件是空的', 'warning');
         return;
       }
       if (incoming.length) {
@@ -258,14 +333,17 @@ export default function App() {
         setImages((prev) => ({ ...prev, ...incomingImages }));
         // 写盘失败不该拦住已经进内存的内容，只提示
         await Promise.all(Object.entries(incomingImages).map(([n, url]) => putImage(n, url))).catch(() =>
-          flash('部分图片写入本地库失败'),
+          flash('部分图片写入本地库失败', 'warning'),
         );
       }
       const parts = [incoming.length ? `${incoming.length} 篇草稿` : '', imageCount ? `${imageCount} 张图片` : ''];
-      flash(`已导入 ${parts.filter(Boolean).join(' · ')}${skipped.length ? `（跳过 ${skipped.length} 个文件）` : ''}`);
+      flash(
+        `已导入 ${parts.filter(Boolean).join(' · ')}${skipped.length ? `（跳过 ${skipped.length} 个文件）` : ''}`,
+        'success',
+      );
     } catch (err) {
       console.warn('导入失败', err);
-      flash('导入失败，文件可能已损坏');
+      flash('导入失败，文件可能已损坏', 'error');
     }
   };
 
@@ -273,7 +351,7 @@ export default function App() {
   const handleExportMarkdown = () => {
     if (!activeDraft) return;
     exportDraftMarkdown(activeDraft);
-    flash(`已导出「${activeDraft.name}.md」`);
+    flash(`已导出「${activeDraft.name}.md」`, 'success');
   };
 
   /** 导出全部草稿 + 图片为 zip 备份 */
@@ -281,10 +359,10 @@ export default function App() {
     setExporting(true);
     try {
       await exportBackupZip(drafts, images);
-      flash(`已导出备份（${drafts.length} 篇草稿 · ${Object.keys(images).length} 张图片）`);
+      flash(`已导出备份（${drafts.length} 篇草稿 · ${Object.keys(images).length} 张图片）`, 'success');
     } catch (err) {
       console.warn('备份失败', err);
-      flash('备份导出失败');
+      flash('备份导出失败', 'error');
     } finally {
       setExporting(false);
     }
@@ -298,80 +376,13 @@ export default function App() {
       const { body } = renderArticle(markdown, theme, images, density);
       const blob = await renderLongImage({ body, theme, author: '稿域' });
       downloadBlob(`${safeFileName(activeDraft?.name ?? '长图')}.png`, blob);
-      flash('长图已导出');
+      flash('长图已导出', 'success');
     } catch (err) {
       console.warn('长图导出失败', err);
-      flash(err instanceof Error ? err.message : '长图导出失败');
+      flash(err instanceof Error ? err.message : '长图导出失败', 'error');
     } finally {
       setExporting(false);
     }
-  };
-
-  /** 拖拽分割条：同步更新编辑器 DOM 宽度（跟手），mouseup 时落回 state */
-  const handleDrag = (clientX: number) => {
-    const split = splitRef.current;
-    const editor = editorRef.current;
-    if (!split || !editor) return;
-    const rect = split.getBoundingClientRect();
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    // 编辑器宽度范围：[MIN_EDITOR_PX, W - MIN_PREVIEW_PX]（预览最小保留真实手机宽度）
-    const minPct = (MIN_EDITOR_PX / rect.width) * 100;
-    const maxPct = ((rect.width - MIN_PREVIEW_PX) / rect.width) * 100;
-    const clamped = Math.max(minPct, Math.min(maxPct, pct));
-    editor.style.width = `${clamped}%`; // 直接改 DOM，跳过 React 渲染延迟
-    void editor.offsetHeight; // 强制 reflow，跳过宽度过渡
-  };
-
-  /** 拖拽开始/结束：直接控制 DOM 类（ref 不触发渲染，类必须手动切换） */
-  const setDraggingUi = (on: boolean) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.classList.toggle('no-transition', on);
-  };
-
-  const endDrag = () => {
-    draggingRef.current = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.documentElement.classList.remove('split-dragging');
-    setDraggingUi(false);
-    const editor = editorRef.current;
-    const split = splitRef.current;
-    if (editor && split) {
-      const rect = split.getBoundingClientRect();
-      // 把最终宽度写回 state（供预览模式切换 / 复位引用）
-      setEditorPct(Math.max(0, Math.min(100, (editor.getBoundingClientRect().width / rect.width) * 100)));
-    }
-  };
-
-  // 全局拖拽监听（常驻挂载，回调内检查拖拽标志）
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (draggingRef.current) handleDrag(e.clientX);
-    };
-    const onUp = () => {
-      if (draggingRef.current) endDrag();
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    return () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-  }, []);
-
-  /** 双击分割条复位（预览最小宽度） */
-  const resetSplit = () => {
-    const editor = editorRef.current;
-    const split = splitRef.current;
-    if (!editor || !split) return;
-    setDraggingUi(true);
-    const rect = split.getBoundingClientRect();
-    const pct = Math.round(((rect.width - MIN_PREVIEW_PX) / rect.width) * 1000) / 10;
-    editor.style.width = `${pct}%`;
-    void editor.offsetHeight;
-    setDraggingUi(false);
-    setEditorPct(pct);
   };
 
   /**
@@ -380,74 +391,161 @@ export default function App() {
    */
   const scrollSync = useRef(createScrollSyncChannel()).current;
 
-  const isPreviewOnly = viewMode === 'preview';
-
   return (
-    <div className="app">
-      <Toolbar
-        viewMode={viewMode}
-        onViewMode={setViewMode}
-        status={status}
-        onCopy={handleCopy}
-        onImport={(files) => void handleImport(files)}
-        onExportMarkdown={handleExportMarkdown}
-        onExportBackup={() => void handleExportBackup()}
-        onExportImage={() => void handleExportImage()}
-        exporting={exporting}
-        themeId={themeId}
-        onThemeChange={setThemeId}
-        densityId={densityId}
-        onDensityChange={setDensityId}
-      />
-      <main className={`workspace ${isPreviewOnly ? 'mode-preview' : ''}`}>
-        <FileTree
-          drafts={drafts}
-          activeId={activeId}
-          onSelect={setActiveDraft}
-          onNew={handleNewDraft}
-          onRename={handleRenameDraft}
-          onDelete={handleDeleteDraft}
-          images={images}
-          usedImageNames={usedImageNames}
-          onDeleteImage={handleDeleteImage}
-          onCleanupImages={handleCleanupImages}
-          onLocateImage={handleLocateImage}
-        />
-        <div className="split" ref={splitRef}>
-          <EditorPane
-            ref={editorRef}
-            value={markdown}
-            onChange={setMarkdown}
-            onAddImage={handleAddImage}
-            imageNames={Object.keys(images)}
-            draftId={activeId}
-            sync={scrollSync}
-            jumpRequest={jumpRequest}
-            collapsed={isPreviewOnly}
-            widthPct={editorPct}
+    <SidebarProvider className="app-shell">
+      <Sidebar className="app-sidebar border-r-0!" collapsible="offcanvas">
+        <SidebarHeader className="app-sidebar-head">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">稿</span>
+            <span className="title">稿域</span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent className="app-sidebar-content">
+          <FileTree
+            drafts={drafts}
+            activeId={activeId}
+            onSelect={setActiveDraft}
+            onNew={handleNewDraft}
+            onRename={handleRenameDraft}
+            onDelete={handleDeleteDraft}
+            images={images}
+            usedImageNames={usedImageNames}
+            onDeleteImage={handleDeleteImage}
+            onCleanupImages={handleCleanupImages}
+            onLocateImage={handleLocateImage}
           />
-          <div
-            className="split-bar"
-            title="拖动调整 · 双击复位"
-            onMouseDown={(e) => {
-              draggingRef.current = true;
-              document.body.style.cursor = 'col-resize';
-              document.body.style.userSelect = 'none';
-              document.documentElement.classList.add('split-dragging');
-              setDraggingUi(true);
-              handleDrag(e.clientX);
-            }}
-            onDoubleClick={resetSplit}
-          />
-          <PreviewPane
-            body={result.body}
-            theme={theme}
-            hasImage={result.hasImage}
-            resizeKey={`${viewMode}:${editorPct}`}
-            sync={scrollSync}
-          />
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+
+      <SidebarInset className="app">
+        <div className={`workspace ${isPreviewOnly ? 'mode-preview' : ''}`}>
+          <section className="workspace-panel">
+            <div className="workspace-panel-head">
+              <div className="workspace-panel-head-left">
+                <TooltipHint content="切换侧栏">
+                  <SidebarTrigger className="rounded-md" />
+                </TooltipHint>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={viewMode}
+                variant="outline"
+                size="sm"
+                spacing={0}
+                aria-label="工作区模式"
+                className="workspace-mode-switch"
+                onValueChange={(value) => value && setViewMode(value as 'split' | 'preview')}
+              >
+                <ToggleGroupItem value="split" aria-label="对照模式">对照</ToggleGroupItem>
+                <ToggleGroupItem value="preview" aria-label="预览模式">预览</ToggleGroupItem>
+              </ToggleGroup>
+              <Toolbar
+                onCopy={handleCopy}
+                onImport={(files) => void handleImport(files)}
+                onExportMarkdown={handleExportMarkdown}
+                onExportBackup={() => void handleExportBackup()}
+                onExportImage={() => void handleExportImage()}
+                exporting={exporting}
+              />
+            </div>
+            <ResizablePanelGroup
+              key={isNarrow ? 'vertical' : 'horizontal'}
+              className="split"
+              orientation={isNarrow ? 'vertical' : 'horizontal'}
+            >
+              <ResizablePanel
+                id="editor"
+                className="editor-panel"
+                panelRef={editorPanelRef}
+                collapsible
+                collapsedSize={0}
+                defaultSize={isNarrow ? '50%' : undefined}
+                minSize={isNarrow ? MIN_EDITOR_HEIGHT_PX : MIN_EDITOR_PX}
+              >
+                <EditorPane
+                  value={markdown}
+                  onChange={setMarkdown}
+                  onAddImage={handleAddImage}
+                  imageNames={Object.keys(images)}
+                  draftId={activeId}
+                  sync={scrollSync}
+                  jumpRequest={jumpRequest}
+                  collapsed={isPreviewOnly}
+                  outlineOpen={outlineOpen}
+                />
+              </ResizablePanel>
+              <TooltipHint content="拖动调整 · 双击复位">
+                <ResizableHandle
+                  withHandle
+                  className="workspace-resize-handle"
+                  disabled={isPreviewOnly}
+                />
+              </TooltipHint>
+              <ResizablePanel
+                id="preview"
+                className="preview-panel"
+                defaultSize={isNarrow ? '50%' : MIN_PREVIEW_PX}
+                minSize={isNarrow ? MIN_PREVIEW_HEIGHT_PX : MIN_PREVIEW_PX}
+                groupResizeBehavior={isNarrow ? 'preserve-relative-size' : 'preserve-pixel-size'}
+              >
+                <PreviewPane
+                  body={result.body}
+                  theme={theme}
+                  resizeKey={`${viewMode}:${isNarrow ? 'vertical' : 'horizontal'}`}
+                  sync={scrollSync}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+            <div className="workspace-statusbar">
+              <div className="workspace-statusbar-left">
+                <button
+                  className={`outline-toggle ${outlineOpen ? 'active' : ''}`}
+                  aria-label="目录"
+                  aria-expanded={outlineOpen}
+                  onClick={() => {
+                    if (isPreviewOnly) setViewMode('split');
+                    setOutlineOpen((value) => !value);
+                  }}
+                >
+                  <ListTree size={14} />
+                  <span>目录</span>
+                </button>
+                <TooltipHint
+                  content={countLevel === 'over'
+                    ? '已超过微信 2 万字上限'
+                    : countLevel === 'warn'
+                      ? '接近微信 2 万字上限'
+                      : undefined}
+                >
+                  <span className={countClass}>{charCount} 字</span>
+                </TooltipHint>
+                <span className="pane-stat save-state">{saved ? '已保存' : '保存中'}</span>
+              </div>
+              <ThemeControls
+                themeId={themeId}
+                onThemeChange={setThemeId}
+                densityId={densityId}
+                onDensityChange={setDensityId}
+              />
+            </div>
+          </section>
         </div>
-      </main>
-    </div>
+      </SidebarInset>
+      <AlertDialog open={Boolean(confirmation)} onOpenChange={(open) => !open && setConfirmation(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmation?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmation?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => confirmation?.onConfirm()}>
+              {confirmation?.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </SidebarProvider>
   );
 }

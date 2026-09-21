@@ -12,7 +12,6 @@ import {
   Link,
   List,
   ListChecks,
-  ListTree,
   Minus,
   Quote,
   Table,
@@ -25,6 +24,7 @@ import { searchKeymap } from '@codemirror/search';
 import { autocompletion } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
+import { TooltipHint } from '@/components/ui/tooltip';
 import { registerImageFiles } from '@/core/image/images';
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
 
@@ -45,8 +45,8 @@ interface Props {
   sync: ScrollSyncChannel;
   /** 预览模式：面板收起 */
   collapsed: boolean;
-  /** 编辑器侧宽度（百分比） */
-  widthPct: number;
+  /** 底部通栏控制的目录展开状态 */
+  outlineOpen: boolean;
   /**
    * 外部跳转请求（文件树点击图片时定位到引用处）。
    * nonce 用来区分「同一行被再次请求」，否则重复点同一张图不会触发 effect。
@@ -55,7 +55,7 @@ interface Props {
 }
 
 const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
-  { value, onChange, onAddImage, imageNames, draftId, sync, collapsed, widthPct, jumpRequest },
+  { value, onChange, onAddImage, imageNames, draftId, sync, collapsed, outlineOpen, jumpRequest },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -69,15 +69,6 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   imageNamesRef.current = imageNames;
   /** 编辑器最近一次上报给父组件的文本（用来区分「自己改的」和「外部改的」） */
   const lastEmittedRef = useRef(value);
-  const [saved, setSaved] = useState(true);
-
-  // 防抖展示「已自动保存」（与 App 的 300ms 防抖保存联动）
-  useEffect(() => {
-    setSaved(false);
-    const timer = window.setTimeout(() => setSaved(true), 700);
-    return () => window.clearTimeout(timer);
-  }, [value]);
-
   /** 注册图片，并在当前光标处插入 Obsidian 嵌入 ![[name]] */
   const insertImages = async (files: File[]) => {
     const view = viewRef.current;
@@ -290,14 +281,6 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const charCount = useMemo(() => value.replace(/\s/g, '').length, [value]);
-  /** 微信正文上限 2 万字：18000 预警、20000 红线 */
-  const WARN_LIMIT = 18000;
-  const HARD_LIMIT = 20000;
-  const countLevel: 'normal' | 'warn' | 'over' =
-    charCount >= HARD_LIMIT ? 'over' : charCount >= WARN_LIMIT ? 'warn' : 'normal';
-  const countClass = `pane-stat count ${countLevel === 'warn' ? 'count-warn' : countLevel === 'over' ? 'count-over' : ''}`;
-
   /* ---------------- Markdown 格式工具栏 ---------------- */
 
   /** 取编辑器 view，未挂载时返回 null */
@@ -347,8 +330,6 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
 
   /** 标题层级菜单开关 */
   const [headingOpen, setHeadingOpen] = useState(false);
-  /** 大纲抽屉开关 */
-  const [outlineOpen, setOutlineOpen] = useState(false);
   const headingWrapRef = useRef<HTMLDivElement>(null);
   // 点击菜单外关闭
   useEffect(() => {
@@ -414,68 +395,27 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     <section
       ref={ref}
       className={`split-pane editor-side ${collapsed ? 'collapsed' : ''}`}
-      style={{ width: `${widthPct}%` }}
       aria-hidden={collapsed}
       inert={collapsed}
     >
-      <div className="pane-head">
-        <span className="pane-title">
-          源码
-        </span>
-        <div className="pane-head-right">
-          <button
-            className={`outline-toggle ${outlineOpen ? 'active' : ''}`}
-            title="大纲"
-            aria-label="大纲"
-            aria-expanded={outlineOpen}
-            onClick={() => setOutlineOpen((v) => !v)}
-          >
-            <ListTree size={15} />
-          </button>
-          <span className="pane-stat">{saved ? '已保存' : '保存中'}</span>
-          <span
-            className={countClass}
-            title={countLevel === 'over' ? '已超过微信 2 万字上限' : countLevel === 'warn' ? '接近微信 2 万字上限' : undefined}
-          >
-            {charCount} 字
-          </span>
-        </div>
-      </div>
-      {outlineOpen && (
-        <div className="outline-drawer">
-          {outline.length === 0 ? (
-            <p className="outline-empty">暂无标题，用 `# ` 开始编写大纲</p>
-          ) : (
-            outline.map((item, idx) => (
-              <button
-                key={idx}
-                className={`outline-item lv${item.level}`}
-                style={{ paddingLeft: `${8 + (item.level - 1) * 14}px` }}
-                onClick={() => jumpToLine(item.line)}
-              >
-                {item.text}
-              </button>
-            ))
-          )}
-        </div>
-      )}
       {/* Markdown 格式工具栏 */}
       <div className="md-toolbar" role="toolbar" aria-label="Markdown 格式">
         {/* 标题层级下拉 */}
         <div className="md-toolbar-dropdown" ref={headingWrapRef}>
-          <button
-            className="md-toolbar-btn"
-            title="标题（H1–H4）"
-            aria-label="标题"
-            aria-expanded={headingOpen}
-            aria-haspopup="menu"
-            onClick={(e) => {
-              e.stopPropagation();
-              setHeadingOpen((v) => !v);
-            }}
-          >
-            <Heading size={ICON} />
-          </button>
+          <TooltipHint content="标题（H1–H4）">
+            <button
+              className="md-toolbar-btn"
+              aria-label="标题"
+              aria-expanded={headingOpen}
+              aria-haspopup="menu"
+              onClick={(e) => {
+                e.stopPropagation();
+                setHeadingOpen((v) => !v);
+              }}
+            >
+              <Heading size={ICON} />
+            </button>
+          </TooltipHint>
           {headingOpen && (
             <div className="md-toolbar-menu" role="menu">
               {headingLevels.map((h) => {
@@ -498,9 +438,11 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
           )}
         </div>
         {toolbarBtns.map((b) => (
-          <button key={b.key} className="md-toolbar-btn" title={b.title} aria-label={b.title} onClick={b.onClick}>
-            {b.icon}
-          </button>
+          <TooltipHint key={b.key} content={b.title}>
+            <button className="md-toolbar-btn" aria-label={b.title} onClick={b.onClick}>
+              {b.icon}
+            </button>
+          </TooltipHint>
         )).reduce<React.ReactNode[]>((acc, btn, i) => {
           // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
           const groupEnd = [2, 5, 9];
@@ -510,6 +452,24 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
         }, [])}
       </div>
       <div className="code-edit" ref={hostRef}></div>
+      {outlineOpen && (
+        <div className="outline-drawer">
+          {outline.length === 0 ? (
+            <p className="outline-empty">暂无标题，用 `# ` 开始编写大纲</p>
+          ) : (
+            outline.map((item, idx) => (
+              <button
+                key={idx}
+                className={`outline-item lv${item.level}`}
+                style={{ paddingLeft: `${8 + (item.level - 1) * 14}px` }}
+                onClick={() => jumpToLine(item.line)}
+              >
+                {item.text}
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </section>
   );
 });

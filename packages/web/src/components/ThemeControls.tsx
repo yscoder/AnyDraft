@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Palette, X } from 'lucide-react';
+import { AlignJustify, ChevronsUpDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -11,7 +11,14 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { TooltipHint } from '@/components/ui/tooltip';
 import { DENSITIES, darkThemes, getTheme, lightThemes, type Theme } from '@/core/theme/theme';
 
 interface Props {
@@ -29,47 +36,50 @@ export default function ThemeControls({
 }: Props) {
   const [themeOpen, setThemeOpen] = useState(false);
   const activeTheme = getTheme(themeId);
+  const activeDensity = DENSITIES.find((density) => density.id === densityId) ?? DENSITIES[1];
 
   const renderTheme = (theme: Theme) => {
     const active = theme.id === themeId;
     return (
-      <button
-        key={theme.id}
-        type="button"
-        role="radio"
-        aria-checked={active}
-        className={`theme-card ${active ? 'active' : ''}`}
-        title={`${theme.name} — ${theme.description}`}
-        onClick={() => {
-          onThemeChange(theme.id);
-          setThemeOpen(false);
-        }}
-      >
-        <span className="swatch" style={{ background: theme.body.bg ?? '#ffffff' }}>
-          <span
-            className="swatch-aa"
-            style={{ fontFamily: theme.heading.font, color: theme.heading.color }}
-          >
-            Aa
+      <TooltipHint key={theme.id} content={`${theme.name} — ${theme.description}`} side="left">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={active}
+          className={`theme-card ${active ? 'active' : ''}`}
+          onClick={() => {
+            onThemeChange(theme.id);
+            setThemeOpen(false);
+          }}
+        >
+          <span className="swatch" style={{ background: theme.body.bg ?? '#ffffff' }}>
+            <span
+              className="swatch-aa"
+              style={{ fontFamily: theme.heading.font, color: theme.heading.color }}
+            >
+              Aa
+            </span>
+            <span className="swatch-bar" style={{ background: theme.accent }} />
+            <span className="swatch-line" style={{ background: theme.body.color }} />
+            <span className="swatch-line short" style={{ background: theme.body.color }} />
           </span>
-          <span className="swatch-bar" style={{ background: theme.accent }} />
-          <span className="swatch-line" style={{ background: theme.body.color }} />
-          <span className="swatch-line short" style={{ background: theme.body.color }} />
-        </span>
-        <span className="theme-card-name">{theme.name}</span>
-      </button>
+          <span className="theme-card-name">{theme.name}</span>
+        </button>
+      </TooltipHint>
     );
   };
 
   return (
-    <div className="preference-controls">
+    <div className="preference-controls statusbar-preferences">
       <Drawer open={themeOpen} onOpenChange={setThemeOpen} direction="right">
-        <DrawerTrigger asChild>
-          <Button variant="outline" size="sm" title="选择排版主题">
-            <Palette data-icon="inline-start" />
-            {activeTheme.name}
-          </Button>
-        </DrawerTrigger>
+        <TooltipHint content={`排版主题：${activeTheme.name}`}>
+          <DrawerTrigger asChild>
+            <Button variant="ghost" size="xs" className="statusbar-control">
+              <span className="theme-control-swatch" style={{ background: activeTheme.accent }} aria-hidden="true" />
+              {activeTheme.name}
+            </Button>
+          </DrawerTrigger>
+        </TooltipHint>
         <DrawerPortal>
           <DrawerOverlay className="theme-drawer-overlay" />
           <DrawerContent className="theme-drawer">
@@ -101,28 +111,26 @@ export default function ThemeControls({
         </DrawerPortal>
       </Drawer>
 
-      <div className="density-control">
-        <ToggleGroup
-          type="single"
-          value={densityId}
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label="排版密度"
-          onValueChange={(value) => value && onDensityChange(value)}
-        >
-          {DENSITIES.map((density) => (
-            <ToggleGroupItem
-              key={density.id}
-              value={density.id}
-              aria-label={`${density.name}密度`}
-              className="data-[state=on]:relative data-[state=on]:z-1 data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:font-semibold data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary/90"
-            >
-              {density.name}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
+      <DropdownMenu>
+        <TooltipHint content={`排版密度：${activeDensity.name}`}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="xs" className="statusbar-control density-trigger">
+              <AlignJustify data-icon="inline-start" />
+              {activeDensity.name}
+              <ChevronsUpDown data-icon="inline-end" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipHint>
+        <DropdownMenuContent align="end" side="top" className="min-w-32">
+          <DropdownMenuRadioGroup value={densityId} onValueChange={onDensityChange}>
+            {DENSITIES.map((density) => (
+              <DropdownMenuRadioItem key={density.id} value={density.id}>
+                {density.name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

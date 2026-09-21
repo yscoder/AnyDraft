@@ -128,24 +128,24 @@ button {
 
 .app {
   height: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-/* ---------------- 顶栏（毛玻璃） ---------------- */
+.app-shell {
+  height: 100%;
+  min-height: 0;
+}
 
-.toolbar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  padding: 9px 20px;
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom: 1px solid var(--border);
-  z-index: 40;
+.app-sidebar-head {
+  min-height: 55px;
+  justify-content: center;
+  padding: 12px 14px;
+}
+
+.app-sidebar-content {
+  overflow: hidden;
 }
 
 .brand {
@@ -178,12 +178,12 @@ button {
   color: var(--ink);
 }
 
-.toolbar-right {
+.workspace-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-left: auto;
+  justify-self: end;
+  min-width: 0;
 }
 
 /* 对照 / 预览 分段控件 */
@@ -216,18 +216,48 @@ button {
   font-weight: 600;
 }
 
-/* ---------------- 顶栏偏好设置 ---------------- */
+/* ---------------- 状态栏偏好设置 ---------------- */
 
 .preference-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
 }
 
-.density-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.statusbar-preferences {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.statusbar-control {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.statusbar-control:hover,
+.statusbar-control[aria-expanded='true'] {
+  color: var(--foreground);
+}
+
+.statusbar-control svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.72;
+}
+
+.theme-control-swatch {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1px solid color-mix(in oklch, var(--foreground) 16%, transparent);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
 }
 
 .theme-drawer-overlay {
@@ -381,41 +411,28 @@ button {
 /* ---------------- 文件树面板 ---------------- */
 
 .file-tree {
-  flex: none;
-  width: 208px;
+  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-right: 14px;
-  background: var(--panel);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  backdrop-filter: blur(14px) saturate(1.3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background: transparent;
   overflow: hidden;
-  transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
-}
-
-.file-tree:hover {
-  box-shadow: 0 4px 20px rgba(52, 40, 28, 0.08);
-  border-color: rgba(60, 54, 44, 0.14);
 }
 
 .tree-head {
   flex: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   min-height: 40px;
-  padding: 7px 10px 7px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 7px 8px 7px 14px;
 }
 
 .tree-head-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 1.1px;
   color: var(--muted-foreground);
 }
 
@@ -678,98 +695,16 @@ button {
   flex: 1;
   min-height: 0;
   display: flex;
-  padding: 16px;
+  padding: 8px;
 }
 
-.split {
+.workspace-panel {
   flex: 1;
   min-width: 0;
-  display: flex;
-  align-items: stretch;
-}
-
-/* 拖拽条（一小段分割线常显，hover/拖拽时高亮加长） */
-.split-bar {
-  flex: none;
-  width: 16px;
-  margin: 0 -4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: col-resize;
-  z-index: 5;
-}
-
-.split-bar::after {
-  content: '';
-  width: 3px;
-  height: 44px;
-  border-radius: 999px;
-  background: rgba(60, 54, 44, 0.18);
-}
-
-.split-bar:hover::after,
-.split-dragging .split-bar::after {
-  background: var(--foreground);
-  height: 64px;
-  box-shadow: 0 0 8px color-mix(in oklch, var(--foreground) 28%, transparent);
-}
-
-/* 左侧源码面板：默认占主体，预览保留 430px 最小宽度 */
-.editor-side {
-  flex: 0 0 auto;
-  width: calc(100% - 430px);
-  max-width: calc(100% - 430px);
-  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  backdrop-filter: blur(14px) saturate(1.3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease),
-    width 0.3s var(--ease), flex-basis 0.3s var(--ease), opacity 0.3s var(--ease);
-}
-
-.editor-side:hover {
-  box-shadow: 0 4px 20px rgba(52, 40, 28, 0.08);
-  border-color: rgba(60, 54, 44, 0.14);
-}
-
-/* 拖拽中：禁用宽度过渡，保证分割条跟手 */
-.editor-side.no-transition {
-  transition: none;
-}
-
-/* 预览模式：源码面板收起 */
-.editor-side.collapsed {
-  flex-basis: 0;
-  width: 0;
-  min-width: 0;
-  border: none;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.workspace.mode-preview .split-bar {
-  display: none;
-}
-
-/* 右侧预览面板 */
-.preview-side {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  -webkit-backdrop-filter: blur(14px) saturate(1.3);
-  backdrop-filter: blur(14px) saturate(1.3);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -777,50 +712,116 @@ button {
   transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
 }
 
-.preview-side:hover {
-  box-shadow: 0 4px 20px rgba(52, 40, 28, 0.08);
+.workspace-panel:hover {
   border-color: rgba(60, 54, 44, 0.14);
+  box-shadow: 0 4px 20px rgba(52, 40, 28, 0.08);
 }
 
-/* 面板头 */
-.pane-head {
+.workspace-panel-head {
   flex: none;
-  min-height: 40px;
-  padding: 7px 14px;
-  display: flex;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--border);
 }
 
-.pane-title {
-  display: flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted-foreground);
-  letter-spacing: 1.1px;
+.workspace-panel-head-left {
+  justify-self: start;
 }
 
-.pane-head-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.workspace-mode-switch {
+  background: var(--background);
+}
+
+.split {
+  flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Preview device switch: the shared segmented control, shrunk to the head's
-   quiet 11px scale so it sits beside the stats instead of shouting over them */
-.pane-head .device-switch {
+/* shadcn Resizable 分隔条：保留贯穿分界线和中部把手 */
+.workspace-resize-handle {
+  z-index: 5;
+  background: var(--border);
+}
+
+.workspace-resize-handle > div {
+  width: 3px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(60, 54, 44, 0.18);
+  transition: height 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease);
+}
+
+.workspace-resize-handle:hover > div,
+.workspace-resize-handle:focus-visible > div {
+  background: var(--foreground);
+  height: 64px;
+  box-shadow: 0 0 8px color-mix(in oklch, var(--foreground) 28%, transparent);
+}
+
+.workspace.mode-preview .workspace-resize-handle {
+  display: none;
+}
+
+.editor-panel,
+.preview-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 左侧源码面板：尺寸由 shadcn ResizablePanel 管理 */
+.editor-side {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  overflow: hidden;
+  transition: opacity 0.2s var(--ease);
+}
+
+/* 预览模式：源码面板收起 */
+.editor-side.collapsed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 右侧预览面板 */
+.preview-side {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* 舞台光晕 */
+  background:
+    radial-gradient(520px 300px at 50% 20%, color-mix(in oklch, var(--art-accent) 8%, transparent), transparent 72%),
+    transparent;
+}
+
+.preview-toolbar {
   flex: none;
-  /* Equal columns, each as wide as the longest label, so the active pill is
-     the same size whichever device is on */
+  padding: 24px 0 0;
+  display: flex;
+  justify-content: center;
+}
+
+.preview-toolbar .device-switch {
   display: inline-grid;
   grid-template-columns: repeat(4, 1fr);
 }
 
-.pane-head .device-switch .seg-btn {
+.preview-toolbar .device-switch .seg-btn {
   padding: 2px 9px;
   font-size: 11px;
   white-space: nowrap;
@@ -883,13 +884,13 @@ button {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 5px 10px;
+  gap: 1px;
+  padding: 5px 6px;
   border-bottom: 1px solid var(--border);
 }
 
 .md-toolbar-btn {
-  min-width: 28px;
+  min-width: 26px;
   height: 28px;
   padding: 0;
   border: none;
@@ -912,7 +913,7 @@ button {
   width: 1px;
   height: 16px;
   background: var(--border);
-  margin: 0 5px;
+  margin: 0 2px;
 }
 
 @keyframes menu-in {
@@ -976,14 +977,17 @@ button {
 
 /* 大纲抽屉 */
 .outline-toggle {
-  width: 24px;
-  height: 24px;
+  width: auto;
+  height: 26px;
   border: none;
   background: transparent;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  padding: 0 7px;
+  font-size: 11px;
   color: var(--muted-foreground);
   cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
@@ -1000,7 +1004,8 @@ button {
   max-height: 180px;
   overflow-y: auto;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  background: var(--background);
 }
 
 .outline-item {
@@ -1034,6 +1039,29 @@ button {
   margin: 6px 10px;
   font-size: 12px;
   color: var(--faint);
+}
+
+.workspace-statusbar {
+  flex: none;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+}
+
+.workspace-statusbar-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-statusbar .save-state {
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
 }
 
 .code-edit {
@@ -1080,10 +1108,6 @@ button {
   display: flex;
   justify-content: center;
   align-items: stretch;
-  /* 舞台光晕 */
-  background:
-    radial-gradient(520px 300px at 50% 20%, color-mix(in oklch, var(--art-accent) 8%, transparent), transparent 72%),
-    transparent;
 }
 
 /* iPhone 设备框：钛金属边框 + 细高光内圈 */
@@ -1312,37 +1336,6 @@ button {
   content: '·';
   margin-right: 8px;
   color: var(--art-foot-text);
-}
-
-/* 文章底栏：分享 / 收藏 / 在看 / 点赞（内容末尾，流式） */
-.article-footer {
-  position: static;
-  padding: 14px 28px 24px;
-  background: var(--art-bg);
-  border-top: 1px solid var(--art-hr);
-  transition: none;
-}
-
-.article-footer .actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.article-footer .action {
-  border: none;
-  background: transparent;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  color: var(--art-foot-text);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.article-footer .action:hover {
-  color: var(--art-accent);
-  background: color-mix(in oklch, var(--art-accent) 8%, transparent);
 }
 
 /* 正文容器：样式全部内联 ⇒ 预览与导出（微信粘贴）同构 */
@@ -1806,34 +1799,6 @@ button {
   padding: 14px 56px 24px;
 }
 
-/* ---------------- 底部 Toast（弹性弹出） ---------------- */
-
-.status {
-  position: fixed;
-  bottom: 30px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #332f29;
-  color: #faf8f3;
-  border-radius: 999px;
-  padding: 11px 20px;
-  font-size: 13px;
-  box-shadow: 0 14px 40px rgba(30, 25, 18, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translate(-50%, 24px) scale(0.92);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.28s var(--ease), opacity 0.2s ease;
-  z-index: 80;
-  max-width: min(92vw, 480px);
-}
-
-.status.show {
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
-}
-
 /* ---------------- 自定义滚动条 ---------------- */
 @supports not selector(::-webkit-scrollbar) {
   .code-edit .cm-scroller,
@@ -1910,39 +1875,34 @@ button {
 /* ---------------- 响应式 ---------------- */
 
 @media (max-width: 900px) {
-  .workspace {
-    flex-direction: column;
-  }
-  /* 窄屏：文件树也转为横向条带，避免吃掉过多竖向空间 */
-  .file-tree {
-    width: 100%;
-    margin: 0 0 12px;
-    max-height: 190px;
-  }
   .split {
     flex-direction: column;
-    /* 纵向排布时必须允许收缩，否则 split 会撑成内容高度并溢出工作区 */
     min-height: 0;
   }
-  .split-bar {
-    width: auto;
-    height: 16px;
-    margin: -4px 0;
-    cursor: row-resize;
-  }
-  .split-bar::after {
+
+  .workspace-resize-handle[aria-orientation='horizontal'] > div {
     width: 44px;
     height: 3px;
   }
-  .split-pane.editor-side {
-    /* 覆盖拖拽写入的行内宽度：纵向布局下宽度应占满，由高度对分 */
-    width: 100% !important;
-    /* 基础样式的 max-width: calc(100% - 430px) 在窄屏会算成负值，把编辑器压成 0 */
-    max-width: none;
-    flex: 0 0 50%;
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    padding: 8px;
   }
-  .split-pane.preview-side {
-    flex: 1 1 0;
+
+  .workspace-panel-head {
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
+  .workspace-actions {
+    gap: 4px;
+  }
+
+  .workspace-actions .action-label,
+  .workspace-actions .action-menu-icon {
+    display: none;
   }
 }
 
@@ -1950,12 +1910,5 @@ button {
   * {
     transition: none !important;
     animation: none !important;
-  }
-}
-
-@media (max-width: 900px) {
-  .split-pane.editor-side.collapsed {
-    flex-basis: 0;
-    height: 0;
   }
 }
