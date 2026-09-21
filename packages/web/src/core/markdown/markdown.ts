@@ -240,6 +240,10 @@ const listOpen =
       color: b.color,
       'padding-left': env.theme.listPaddingLeft,
       margin: tokens[idx].level > 0 ? '0' : `0 0 ${env.theme.pMargin}`,
+      // 必须显式写出符号：应用里有 `ol, ul, menu { list-style: none }`（Tailwind
+      // preflight），不写的话预览里只有缩进没有符号，导出到公众号却由 UA 默认
+      // 补上 —— 预览与导出就对不上了
+      'list-style': ordered ? 'decimal' : tokens[idx].level > 0 ? 'circle' : 'disc',
     };
     if (isTask) {
       // 任务清单：无列表圆点（真实公众号样式），符号带左侧缩进
@@ -715,6 +719,11 @@ md.renderer.rules.footnote_ref = ((tokens, idx, _o, env) => {
     'font-size': '0.72em',
     'line-height': '1',
     color: env.theme.footnote.refColor,
+    // 显式钉住上标方式：应用里的 `sup { position: relative; top: -0.5em;
+    // vertical-align: baseline }`（Tailwind preflight）与公众号的 UA 默认
+    // `vertical-align: super` 是两套完全不同的定位，不写就两边不一样
+    'vertical-align': 'super',
+    position: 'static',
   })}"><a href="#fn${n}" style="${st({
     color: env.theme.footnote.refColor,
     'text-decoration': 'none',
