@@ -175,8 +175,16 @@ npm run deploy
 ## 桌面端
 
 桌面客户端生产目标为 Windows x64 与 macOS arm64，最低建议系统分别为 Windows 10
-和 macOS 11。当前仓库提供构建配置，但没有提交签名证书，也没有启用自动更新：
-macOS 本地构建使用 ad-hoc 签名，Windows 本地构建为未签名安装程序。
+和 macOS 11。发布 GitHub Release 时，GitHub Actions 会从该 Release 对应的 tag
+分别构建 macOS `.dmg` 和 Windows NSIS `.exe`，并将安装包上传为 Release Assets。
+
+发布前需同步更新 `packages/desktop/package.json`、
+`packages/desktop/src-tauri/tauri.conf.json` 和
+`packages/desktop/src-tauri/Cargo.toml` 中的版本号，然后创建并发布对应的版本 tag，
+例如 `v0.1.0`。
+
+当前仓库没有提交签名证书，也没有启用自动更新：macOS 构建使用 ad-hoc 签名，
+Windows 构建为未签名安装程序。
 
 正式外部分发前需要配置 macOS Developer ID 签名与公证，以及 Windows 代码签名；
 未签名产物可能被系统安全机制拦截或显示警告。
