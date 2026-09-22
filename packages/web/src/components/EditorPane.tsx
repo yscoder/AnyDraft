@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bold,
   Code,
@@ -16,86 +16,109 @@ import {
   Quote,
   Table,
   Undo2,
-} from 'lucide-react';
-import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
-import { defaultKeymap, history, historyKeymap, indentWithTab, undo } from '@codemirror/commands';
-import { searchKeymap } from '@codemirror/search';
-import { autocompletion } from '@codemirror/autocomplete';
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { languages } from '@codemirror/language-data';
-import { TooltipHint } from '@/components/ui/tooltip';
-import type { ScrollSyncChannel } from '@/core/editor/scrollSync';
+} from 'lucide-react'
+import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  undo,
+} from '@codemirror/commands'
+import { searchKeymap } from '@codemirror/search'
+import { autocompletion } from '@codemirror/autocomplete'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { languages } from '@codemirror/language-data'
+import { TooltipHint } from '@/components/ui/tooltip'
+import type { ScrollSyncChannel } from '@/core/editor/scrollSync'
 
 /* Lucide 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
-const ICON = 16;
-const HEADING_ICON = { 1: Heading1, 2: Heading2, 3: Heading3, 4: Heading4 } as const;
+const ICON = 16
+const HEADING_ICON = {
+  1: Heading1,
+  2: Heading2,
+  3: Heading3,
+  4: Heading4,
+} as const
 
 interface Props {
-  value: string;
-  onChange: (v: string) => void;
+  value: string
+  onChange: (v: string) => void
   /** 保存一张图片到当前文档同级目录，返回最终文件名（失败返回 null） */
-  onAddImage: (file: File) => Promise<string | null>;
+  onAddImage: (file: File) => Promise<string | null>
   /** 已导入图片名列表（![[ 自动补全用） */
-  imageNames: string[];
+  imageNames: string[]
   /** 当前文档路径：切换文档时强制同步 doc */
-  fileKey: string;
+  fileKey: string
   /** 滚动同步通道：把编辑器顶部对应的源码位置发布给预览 */
-  sync: ScrollSyncChannel;
+  sync: ScrollSyncChannel
   /** 预览模式：面板收起 */
-  collapsed: boolean;
+  collapsed: boolean
   /** 底部通栏控制的目录展开状态 */
-  outlineOpen: boolean;
+  outlineOpen: boolean
   /**
    * 外部跳转请求（文件树点击图片时定位到引用处）。
    * nonce 用来区分「同一行被再次请求」，否则重复点同一张图不会触发 effect。
    */
-  jumpRequest: { line: number; nonce: number } | null;
+  jumpRequest: { line: number; nonce: number } | null
 }
 
 const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
-  { value, onChange, onAddImage, imageNames, fileKey, sync, collapsed, outlineOpen, jumpRequest },
+  {
+    value,
+    onChange,
+    onAddImage,
+    imageNames,
+    fileKey,
+    sync,
+    collapsed,
+    outlineOpen,
+    jumpRequest,
+  },
   ref,
 ) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const syncRef = useRef(sync);
-  syncRef.current = sync;
+  const hostRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const syncRef = useRef(sync)
+  syncRef.current = sync
   // 补全候选走 ref：CodeMirror 扩展只在挂载时建一次，直接闭包会永远停在挂载时的空列表
-  const imageNamesRef = useRef(imageNames);
-  imageNamesRef.current = imageNames;
+  const imageNamesRef = useRef(imageNames)
+  imageNamesRef.current = imageNames
   /** 编辑器最近一次上报给父组件的文本（用来区分「自己改的」和「外部改的」） */
-  const lastEmittedRef = useRef(value);
+  const lastEmittedRef = useRef(value)
   /** onAddImage 走 ref：CodeMirror 监听只在挂载时注册，闭包会停在首个文档 */
-  const onAddImageRef = useRef(onAddImage);
-  onAddImageRef.current = onAddImage;
+  const onAddImageRef = useRef(onAddImage)
+  onAddImageRef.current = onAddImage
   /** 逐张保存图片，成功后回填 ![[name]] 到光标处 */
   const insertImages = async (files: File[]) => {
-    const view = viewRef.current;
-    if (!view) return;
-    const names: string[] = [];
+    const view = viewRef.current
+    if (!view) return
+    const names: string[] = []
     for (const file of files) {
       try {
-        const name = await onAddImageRef.current(file);
-        if (name) names.push(name);
+        const name = await onAddImageRef.current(file)
+        if (name) names.push(name)
       } catch {
         // 单张失败不阻断其它图片
       }
     }
-    if (!names.length || !view) return;
-    const block = names.map((n) => `![[${n}]]\n`).join('');
+    if (!names.length || !view) return
+    const block = names.map((n) => `![[${n}]]\n`).join('')
     view.dispatch({
       changes: { from: view.state.selection.main.head, insert: block },
-      selection: { anchor: view.state.selection.main.head + block.length },
-    });
-  };
+      selection: {
+        anchor: view.state.selection.main.head + block.length,
+      },
+    })
+  }
 
   // 初始化 CodeMirror 编辑器
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
+    const host = hostRef.current
+    if (!host) return
 
     const view = new EditorView({
       parent: host,
@@ -113,15 +136,15 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             {
               key: 'Mod-b',
               run: () => {
-                wrapSelection('**', '**');
-                return true;
+                wrapSelection('**', '**')
+                return true
               },
             },
             {
               key: 'Mod-i',
               run: () => {
-                wrapSelection('*', '*');
-                return true;
+                wrapSelection('*', '*')
+                return true
               },
             },
           ]),
@@ -134,8 +157,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
           autocompletion({
             override: [
               (ctx) => {
-                const before = ctx.matchBefore(/!\[\[[\w一-龥.-]*$/);
-                if (!before) return null;
+                const before = ctx.matchBefore(/!\[\[[\w一-龥.-]*$/)
+                if (!before) return null
                 return {
                   from: before.from + 3,
                   options: imageNamesRef.current.map((name) => ({
@@ -143,14 +166,14 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
                     type: 'image',
                     apply: `${name}]]`,
                   })),
-                };
+                }
               },
             ],
           }),
           EditorView.theme({
             '&': { height: '100%', fontSize: '13.5px' },
             '.cm-scroller': {
-              fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+              fontFamily: 'var(--font-sans)',
               lineHeight: '1.75',
               overflow: 'auto',
             },
@@ -169,206 +192,238 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             },
             '.cm-activeLineGutter': { background: 'transparent' },
             '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-              background: 'color-mix(in oklch, var(--foreground) 14%, transparent)',
+              background:
+                'color-mix(in oklch, var(--foreground) 14%, transparent)',
             },
             '&.cm-focused': { outline: 'none' },
             '.cm-activeLine': { background: 'transparent' },
           }),
           EditorView.updateListener.of((update) => {
-            if (!update.docChanged) return;
-            const next = update.state.doc.toString();
-            lastEmittedRef.current = next;
-            onChangeRef.current(next);
+            if (!update.docChanged) return
+            const next = update.state.doc.toString()
+            lastEmittedRef.current = next
+            onChangeRef.current(next)
           }),
         ],
       }),
-    });
-    viewRef.current = view;
+    })
+    viewRef.current = view
 
     // 编辑滚动 → 预览同步：上报「行号 + 行内比例」这样一个连续量。
     // 只报整数行号会让预览等一整行翻过去才跳一次，观感就是一顿一顿的。
-    const scroller = view.scrollDOM;
+    const scroller = view.scrollDOM
     /** 某个 scrollTop 对应的源码位置（行号 + 行内比例） */
     const positionAt = (scrollTop: number) => {
       // lineBlockAtHeight 用的是「文档高度」坐标系，需先扣掉内容区上边距
-      const docTop = Math.max(0, scrollTop - view.documentPadding.top);
-      const block = view.lineBlockAtHeight(docTop);
-      const line = view.state.doc.lineAt(block.from).number - 1;
-      const frac = block.height > 0 ? Math.min(1, Math.max(0, (docTop - block.top) / block.height)) : 0;
-      return line + frac;
-    };
+      const docTop = Math.max(0, scrollTop - view.documentPadding.top)
+      const block = view.lineBlockAtHeight(docTop)
+      const line = view.state.doc.lineAt(block.from).number - 1
+      const frac =
+        block.height > 0
+          ? Math.min(1, Math.max(0, (docTop - block.top) / block.height))
+          : 0
+      return line + frac
+    }
     const onScroll = () => {
-      const max = scroller.scrollHeight - scroller.clientHeight;
-      const atBottom = max > 0 && scroller.scrollTop >= max - 2;
-      const atTop = scroller.scrollTop <= 2;
-      const position = positionAt(scroller.scrollTop);
+      const max = scroller.scrollHeight - scroller.clientHeight
+      const atBottom = max > 0 && scroller.scrollTop >= max - 2
+      const atTop = scroller.scrollTop <= 2
+      const position = positionAt(scroller.scrollTop)
       // 顺带上报「滚到底时的位置」，预览用它把文末当虚拟锚点
       syncRef.current.publish({
         position,
         endPosition: max > 0 ? positionAt(max) : position,
         atTop,
         atBottom,
-      });
-    };
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+      })
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
 
     return () => {
-      scroller.removeEventListener('scroll', onScroll);
-      view.destroy();
-      viewRef.current = null;
-    };
+      scroller.removeEventListener('scroll', onScroll)
+      view.destroy()
+      viewRef.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   // 内容同步：文档切换（fileKey 变化）或外部 value 变化（导入/刷新）时，
   // 若 doc 与 value 不同则全量替换并尽量保持光标。
   // 编辑/撤销产生的变化经 updateListener 已即时写回 value（cur === value），
   // 不会触发这里的同步，因此不影响输入与撤销。
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    // 自己敲出来的改动已经在 updateListener 里上报过，直接跳过 —— 
+    const view = viewRef.current
+    if (!view) return
+    // 自己敲出来的改动已经在 updateListener 里上报过，直接跳过 ——
     // 否则每次按键都要把整篇文档 toString 出来比一遍
-    if (lastEmittedRef.current === value) return;
-    const cur = view.state.doc.toString();
+    if (lastEmittedRef.current === value) return
+    const cur = view.state.doc.toString()
     if (cur === value) {
-      lastEmittedRef.current = value;
-      return;
+      lastEmittedRef.current = value
+      return
     }
-    const { anchor, head } = view.state.selection.main;
-    lastEmittedRef.current = value;
+    const { anchor, head } = view.state.selection.main
+    lastEmittedRef.current = value
     view.dispatch({
       changes: { from: 0, to: cur.length, insert: value },
-      selection: { anchor: Math.min(anchor, value.length), head: Math.min(head, value.length) },
-    });
+      selection: {
+        anchor: Math.min(anchor, value.length),
+        head: Math.min(head, value.length),
+      },
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileKey, value]);
+  }, [fileKey, value])
 
   // 外部跳转：定位到指定行并居中。
   // 声明顺序在内容同步之后 —— 跨草稿跳转时新文档已经就位，行号才对得上。
   useEffect(() => {
-    if (!jumpRequest) return;
-    const view = viewRef.current;
-    if (!view) return;
-    const lineNo = Math.min(Math.max(1, jumpRequest.line + 1), view.state.doc.lines);
-    const pos = view.state.doc.line(lineNo).from;
+    if (!jumpRequest) return
+    const view = viewRef.current
+    if (!view) return
+    const lineNo = Math.min(
+      Math.max(1, jumpRequest.line + 1),
+      view.state.doc.lines,
+    )
+    const pos = view.state.doc.line(lineNo).from
     view.dispatch({
       selection: { anchor: pos },
       effects: EditorView.scrollIntoView(pos, { y: 'center' }),
-    });
-    view.focus();
-  }, [jumpRequest]);
+    })
+    view.focus()
+  }, [jumpRequest])
 
   // 粘贴图片（截图后直接 ⌘V）
   useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const dom = view.dom;
+    const view = viewRef.current
+    if (!view) return
+    const dom = view.dom
     const onPaste = (e: ClipboardEvent) => {
       const files = Array.from(e.clipboardData?.items ?? [])
         .filter((it) => it.type.startsWith('image/'))
         .map((it) => it.getAsFile())
-        .filter((f): f is File => !!f);
-      if (!files.length) return;
-      e.preventDefault();
-      void insertImages(files);
-    };
+        .filter((f): f is File => !!f)
+      if (!files.length) return
+      e.preventDefault()
+      void insertImages(files)
+    }
     const onDrop = (e: DragEvent) => {
-      const files = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'));
-      if (!files.length) return;
-      e.preventDefault();
-      void insertImages(files);
-    };
-    const onDragover = (e: DragEvent) => e.preventDefault();
-    dom.addEventListener('paste', onPaste);
-    dom.addEventListener('drop', onDrop);
-    dom.addEventListener('dragover', onDragover);
+      const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
+        f.type.startsWith('image/'),
+      )
+      if (!files.length) return
+      e.preventDefault()
+      void insertImages(files)
+    }
+    const onDragover = (e: DragEvent) => e.preventDefault()
+    dom.addEventListener('paste', onPaste)
+    dom.addEventListener('drop', onDrop)
+    dom.addEventListener('dragover', onDragover)
     return () => {
-      dom.removeEventListener('paste', onPaste);
-      dom.removeEventListener('drop', onDrop);
-      dom.removeEventListener('dragover', onDragover);
-    };
+      dom.removeEventListener('paste', onPaste)
+      dom.removeEventListener('drop', onDrop)
+      dom.removeEventListener('dragover', onDragover)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   /* ---------------- Markdown 格式工具栏 ---------------- */
 
   /** 取编辑器 view，未挂载时返回 null */
   const withView = <T,>(fn: (view: EditorView) => T): T | null => {
-    const view = viewRef.current;
-    return view ? fn(view) : null;
-  };
+    const view = viewRef.current
+    return view ? fn(view) : null
+  }
 
   /** 包裹选区（加粗/斜体/行内码）；无选区时插入成对标记并置光标于中间 */
   const wrapSelection = (before: string, after: string) =>
     withView((view) => {
-      const { from, to } = view.state.selection.main;
-      const text = view.state.doc.sliceString(from, to);
-      const sel = text ? { anchor: from + before.length, head: to + before.length } : { anchor: from + before.length };
-      view.dispatch({ changes: [{ from, to, insert: before + text + after }], selection: sel });
-      view.focus();
-    });
+      const { from, to } = view.state.selection.main
+      const text = view.state.doc.sliceString(from, to)
+      const sel = text
+        ? { anchor: from + before.length, head: to + before.length }
+        : { anchor: from + before.length }
+      view.dispatch({
+        changes: [{ from, to, insert: before + text + after }],
+        selection: sel,
+      })
+      view.focus()
+    })
 
   /** 行首加前缀（标题/引用/列表/待办）；光标所在行整行加 */
   const prefixLine = (prefix: string) =>
     withView((view) => {
-      const line = view.state.doc.lineAt(view.state.selection.main.head);
-      view.dispatch({ changes: { from: line.from, insert: prefix }, selection: { anchor: line.from + prefix.length } });
-      view.focus();
-    });
+      const line = view.state.doc.lineAt(view.state.selection.main.head)
+      view.dispatch({
+        changes: { from: line.from, insert: prefix },
+        selection: { anchor: line.from + prefix.length },
+      })
+      view.focus()
+    })
 
   /** 光标处插入块（代码围栏/分割线/表格） */
   const insertBlock = (text: string) =>
     withView((view) => {
-      const head = view.state.selection.main.head;
-      view.dispatch({ changes: { from: head, insert: text }, selection: { anchor: head + text.length } });
-      view.focus();
-    });
+      const head = view.state.selection.main.head
+      view.dispatch({
+        changes: { from: head, insert: text },
+        selection: { anchor: head + text.length },
+      })
+      view.focus()
+    })
 
   /** 撤销（CodeMirror 历史栈） */
-  const undoEdit = () => withView((view) => { undo(view); view.focus(); });
+  const undoEdit = () =>
+    withView((view) => {
+      undo(view)
+      view.focus()
+    })
 
   /** 插入 3×3 表格模板（光标置于表体首格） */
   const insertTable = () =>
     withView((view) => {
-      const head = view.state.selection.main.head;
-      const table = '\n| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|  |  |  |\n';
-      const bodyStart = head + table.indexOf('|  |');
-      view.dispatch({ changes: { from: head, insert: table }, selection: { anchor: bodyStart + 2 } });
-      view.focus();
-    });
+      const head = view.state.selection.main.head
+      const table =
+        '\n| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|  |  |  |\n'
+      const bodyStart = head + table.indexOf('|  |')
+      view.dispatch({
+        changes: { from: head, insert: table },
+        selection: { anchor: bodyStart + 2 },
+      })
+      view.focus()
+    })
 
   /** 标题层级菜单开关 */
-  const [headingOpen, setHeadingOpen] = useState(false);
-  const headingWrapRef = useRef<HTMLDivElement>(null);
+  const [headingOpen, setHeadingOpen] = useState(false)
+  const headingWrapRef = useRef<HTMLDivElement>(null)
   // 点击菜单外关闭
   useEffect(() => {
-    if (!headingOpen) return;
+    if (!headingOpen) return
     const onDocClick = (e: MouseEvent) => {
-      if (!headingWrapRef.current?.contains(e.target as Node)) setHeadingOpen(false);
-    };
+      if (!headingWrapRef.current?.contains(e.target as Node))
+        setHeadingOpen(false)
+    }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setHeadingOpen(false);
-    };
-    document.addEventListener('click', onDocClick);
-    document.addEventListener('keydown', onKeyDown);
+      if (e.key === 'Escape') setHeadingOpen(false)
+    }
+    document.addEventListener('click', onDocClick)
+    document.addEventListener('keydown', onKeyDown)
     return () => {
-      document.removeEventListener('click', onDocClick);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [headingOpen]);
+      document.removeEventListener('click', onDocClick)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [headingOpen])
 
   /** 从 markdown 提取标题大纲（行号 → 标题）；抽屉关闭时不扫描全文 */
   const outline = useMemo(() => {
-    if (!outlineOpen) return [];
-    const items: { level: number; text: string; line: number }[] = [];
+    if (!outlineOpen) return []
+    const items: { level: number; text: string; line: number }[] = []
     value.split('\n').forEach((line, i) => {
-      const m = line.match(/^(#{1,4})\s+(.+)$/);
-      if (m) items.push({ level: m[1].length, text: m[2].trim(), line: i });
-    });
-    return items;
-  }, [value, outlineOpen]);
+      const m = line.match(/^(#{1,4})\s+(.+)$/)
+      if (m) items.push({ level: m[1].length, text: m[2].trim(), line: i })
+    })
+    return items
+  }, [value, outlineOpen])
 
   /** 点击大纲项：跳转编辑器对应行 */
   const jumpToLine = (line: number) =>
@@ -376,31 +431,93 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       view.dispatch({
         selection: { anchor: view.state.doc.line(line + 1).from },
         scrollIntoView: true,
-        effects: EditorView.scrollIntoView(view.state.doc.line(line + 1).from, { y: 'center' }),
-      });
-      view.focus();
-    });
+        effects: EditorView.scrollIntoView(view.state.doc.line(line + 1).from, {
+          y: 'center',
+        }),
+      })
+      view.focus()
+    })
 
   const headingLevels = [
     { level: 1, label: 'H1 · 一级标题', prefix: '# ' },
     { level: 2, label: 'H2 · 二级标题', prefix: '## ' },
     { level: 3, label: 'H3 · 三级标题', prefix: '### ' },
     { level: 4, label: 'H4 · 四级标题', prefix: '#### ' },
-  ];
+  ]
 
-  const toolbarBtns: { key: string; title: string; icon: React.ReactNode; onClick: () => void }[] = [
-    { key: 'bold', title: '加粗', icon: <Bold size={ICON} />, onClick: () => wrapSelection('**', '**') },
-    { key: 'italic', title: '斜体', icon: <Italic size={ICON} />, onClick: () => wrapSelection('*', '*') },
-    { key: 'code', title: '行内代码', icon: <Code size={ICON} />, onClick: () => wrapSelection('`', '`') },
-    { key: 'quote', title: '引用', icon: <Quote size={ICON} />, onClick: () => prefixLine('> ') },
-    { key: 'list', title: '无序列表', icon: <List size={ICON} />, onClick: () => prefixLine('- ') },
-    { key: 'task', title: '待办事项', icon: <ListChecks size={ICON} />, onClick: () => prefixLine('- [ ] ') },
-    { key: 'fence', title: '代码块', icon: <FileCode2 size={ICON} />, onClick: () => insertBlock('\n```ts\n\n```\n') },
-    { key: 'table', title: '表格', icon: <Table size={ICON} />, onClick: insertTable },
-    { key: 'link', title: '链接', icon: <Link size={ICON} />, onClick: () => wrapSelection('[', '](https://)') },
-    { key: 'hr', title: '分割线', icon: <Minus size={ICON} />, onClick: () => insertBlock('\n---\n') },
-    { key: 'undo', title: '撤销', icon: <Undo2 size={ICON} />, onClick: undoEdit },
-  ];
+  const toolbarBtns: {
+    key: string
+    title: string
+    icon: React.ReactNode
+    onClick: () => void
+  }[] = [
+    {
+      key: 'bold',
+      title: '加粗',
+      icon: <Bold size={ICON} />,
+      onClick: () => wrapSelection('**', '**'),
+    },
+    {
+      key: 'italic',
+      title: '斜体',
+      icon: <Italic size={ICON} />,
+      onClick: () => wrapSelection('*', '*'),
+    },
+    {
+      key: 'code',
+      title: '行内代码',
+      icon: <Code size={ICON} />,
+      onClick: () => wrapSelection('`', '`'),
+    },
+    {
+      key: 'quote',
+      title: '引用',
+      icon: <Quote size={ICON} />,
+      onClick: () => prefixLine('> '),
+    },
+    {
+      key: 'list',
+      title: '无序列表',
+      icon: <List size={ICON} />,
+      onClick: () => prefixLine('- '),
+    },
+    {
+      key: 'task',
+      title: '待办事项',
+      icon: <ListChecks size={ICON} />,
+      onClick: () => prefixLine('- [ ] '),
+    },
+    {
+      key: 'fence',
+      title: '代码块',
+      icon: <FileCode2 size={ICON} />,
+      onClick: () => insertBlock('\n```ts\n\n```\n'),
+    },
+    {
+      key: 'table',
+      title: '表格',
+      icon: <Table size={ICON} />,
+      onClick: insertTable,
+    },
+    {
+      key: 'link',
+      title: '链接',
+      icon: <Link size={ICON} />,
+      onClick: () => wrapSelection('[', '](https://)'),
+    },
+    {
+      key: 'hr',
+      title: '分割线',
+      icon: <Minus size={ICON} />,
+      onClick: () => insertBlock('\n---\n'),
+    },
+    {
+      key: 'undo',
+      title: '撤销',
+      icon: <Undo2 size={ICON} />,
+      onClick: undoEdit,
+    },
+  ]
 
   return (
     <section
@@ -420,8 +537,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
               aria-expanded={headingOpen}
               aria-haspopup="menu"
               onClick={(e) => {
-                e.stopPropagation();
-                setHeadingOpen((v) => !v);
+                e.stopPropagation()
+                setHeadingOpen((v) => !v)
               }}
             >
               <Heading size={ICON} />
@@ -430,37 +547,47 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
           {headingOpen && (
             <div className="md-toolbar-menu" role="menu">
               {headingLevels.map((h) => {
-                const HeadingIcon = HEADING_ICON[h.level as keyof typeof HEADING_ICON];
+                const HeadingIcon =
+                  HEADING_ICON[h.level as keyof typeof HEADING_ICON]
                 return (
                   <button
                     key={h.level}
                     role="menuitem"
                     onClick={() => {
-                      setHeadingOpen(false);
-                      prefixLine(h.prefix);
+                      setHeadingOpen(false)
+                      prefixLine(h.prefix)
                     }}
                   >
                     <HeadingIcon size={17} className="menu-heading" />
                     {h.label.split('·')[1]?.trim()}
                   </button>
-                );
+                )
               })}
             </div>
           )}
         </div>
-        {toolbarBtns.map((b) => (
-          <TooltipHint key={b.key} content={b.title}>
-            <button className="md-toolbar-btn" aria-label={b.title} onClick={b.onClick}>
-              {b.icon}
-            </button>
-          </TooltipHint>
-        )).reduce<React.ReactNode[]>((acc, btn, i) => {
-          // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
-          const groupEnd = [2, 5, 9];
-          acc.push(btn);
-          if (groupEnd.includes(i)) acc.push(<span key={`d${i}`} className="md-toolbar-divider"></span>);
-          return acc;
-        }, [])}
+        {toolbarBtns
+          .map((b) => (
+            <TooltipHint key={b.key} content={b.title}>
+              <button
+                className="md-toolbar-btn"
+                aria-label={b.title}
+                onClick={b.onClick}
+              >
+                {b.icon}
+              </button>
+            </TooltipHint>
+          ))
+          .reduce<React.ReactNode[]>((acc, btn, i) => {
+            // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
+            const groupEnd = [2, 5, 9]
+            acc.push(btn)
+            if (groupEnd.includes(i))
+              acc.push(
+                <span key={`d${i}`} className="md-toolbar-divider"></span>,
+              )
+            return acc
+          }, [])}
       </div>
       <div className="code-edit" ref={hostRef}></div>
       {outlineOpen && (
@@ -472,17 +599,19 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
               <button
                 key={idx}
                 className={`outline-item lv${item.level}`}
-                style={{ paddingLeft: `${8 + (item.level - 1) * 14}px` }}
+                style={{
+                  paddingLeft: `${8 + (item.level - 1) * 14}px`,
+                }}
                 onClick={() => jumpToLine(item.line)}
               >
-                {item.text}
+                {item.level > 1 ? '•' : ''} {item.text}
               </button>
             ))
           )}
         </div>
       )}
     </section>
-  );
-});
+  )
+})
 
-export default EditorPane;
+export default EditorPane

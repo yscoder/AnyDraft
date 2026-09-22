@@ -34,7 +34,11 @@
   overflow: hidden;
   /* 舞台光晕 */
   background:
-    radial-gradient(520px 300px at 50% 20%, color-mix(in oklch, var(--art-accent) 8%, transparent), transparent 72%),
+    radial-gradient(
+      520px 300px at 50% 20%,
+      color-mix(in oklch, var(--art-accent) 8%, transparent),
+      transparent 72%
+    ),
     transparent;
 }
 
@@ -119,7 +123,9 @@
   justify-content: center;
   color: var(--muted-foreground);
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease;
 }
 
 .md-toolbar-btn:hover {
@@ -156,7 +162,7 @@
   top: calc(100% + 6px);
   left: 0;
   min-width: 148px;
-  background: rgba(255, 253, 250, 0.96);
+  background: var(--color-card);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid var(--border);
@@ -185,12 +191,12 @@
 }
 
 .md-toolbar-menu button:hover {
-  background: var(--accent-soft);
+  background: var(--muted);
 }
 
 .md-toolbar-menu .menu-heading {
   flex: none;
-  color: var(--accent);
+  color: var(--color-muted-foreground);
 }
 
 /* 大纲抽屉 */
@@ -208,7 +214,10 @@
   font-size: 11px;
   color: var(--muted-foreground);
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    border-color 0.14s ease;
 }
 
 .outline-toggle:hover,
@@ -240,7 +249,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .outline-item:hover {
@@ -291,9 +302,6 @@
 
 .code-edit .cm-editor {
   height: 100%;
-  font-family: var(--font-sans);
-}
-.code-edit .cm-scroller {
   font-family: var(--font-sans);
 }
 

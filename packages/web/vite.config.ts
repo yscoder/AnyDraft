@@ -1,8 +1,7 @@
-import path from 'node:path';
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
+import path from 'node:path'
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 const VENDOR_GROUPS: Record<string, string[]> = {
   react: ['react', 'react-dom', 'scheduler'],
@@ -33,16 +32,18 @@ const VENDOR_GROUPS: Record<string, string[]> = {
     'entities',
     'punycode.js',
   ],
-};
+}
 
 function vendorChunk(id: string): string | undefined {
-  const m = id.split('node_modules/').pop();
-  if (!m) return undefined;
-  const pkg = m.startsWith('@') ? m.split('/').slice(0, 2).join('/') : m.split('/')[0];
+  const m = id.split('node_modules/').pop()
+  if (!m) return undefined
+  const pkg = m.startsWith('@')
+    ? m.split('/').slice(0, 2).join('/')
+    : m.split('/')[0]
   for (const [group, pkgs] of Object.entries(VENDOR_GROUPS)) {
-    if (pkgs.includes(pkg)) return group;
+    if (pkgs.includes(pkg)) return group
   }
-  return undefined;
+  return undefined
 }
 
 export default defineConfig({
@@ -68,8 +69,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 400,
     rollupOptions: {
       output: {
-        manualChunks: (id) => (id.includes('node_modules') ? vendorChunk(id) : undefined),
+        manualChunks: (id) =>
+          id.includes('node_modules') ? vendorChunk(id) : undefined,
       },
     },
   },
-});
+})

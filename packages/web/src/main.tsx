@@ -1,12 +1,17 @@
-import { createRoot } from 'react-dom/client';
-import App from '@/App';
-import { Toaster } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import './styles/index.css';
+import { createRoot } from 'react-dom/client'
+import App from '@/App'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import './styles/index.css'
 
 createRoot(document.getElementById('root')!).render(
   <TooltipProvider>
     <App />
-    <Toaster position="top-center" duration={2200} richColors containerAriaLabel="通知" />
+    <Toaster
+      position="top-center"
+      duration={2200}
+      richColors
+      containerAriaLabel="通知"
+    />
   </TooltipProvider>,
-);
+)

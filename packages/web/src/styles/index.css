@@ -4,17 +4,17 @@
    ============================================================ */
 
 /* ---- 第三方依赖 ---- */
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/figtree";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/figtree';
 
 /* ---- 本地按职责拆分的样式 ---- */
-@import "./workspace.css";
-@import "./editor.css";
-@import "./preview.css";
-@import "./scrollbars.css";
-@import "./responsive.css";
+@import './workspace.css';
+@import './editor.css';
+@import './preview.css';
+@import './scrollbars.css';
+@import './responsive.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -101,8 +101,11 @@
   --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.12), 0 2px 8px rgb(0 0 0 / 0.05);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  --sans: 'Figtree Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --mono:
+    ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --sans:
+    'Figtree Variable', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
   --serif: Georgia, 'Songti SC', 'SimSun', 'Times New Roman', serif;
 }
 

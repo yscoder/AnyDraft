@@ -36,7 +36,14 @@
   /* iPhone 的圆角是连续曲率，半径给大一些更接近真机观感 */
   border-radius: 56px;
   padding: 11px;
-  background: linear-gradient(148deg, #6f6a63 0%, #302c27 26%, #1d1a17 52%, #3a3630 78%, #6b665f 100%);
+  background: linear-gradient(
+    148deg,
+    #6f6a63 0%,
+    #302c27 26%,
+    #1d1a17 52%,
+    #3a3630 78%,
+    #6b665f 100%
+  );
   box-shadow:
     var(--shadow-lg),
     inset 0 0 0 1px rgba(255, 255, 255, 0.14),
@@ -176,7 +183,12 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 32%, #2f3a44 0%, #14181c 62%, #0b0a09 100%);
+  background: radial-gradient(
+    circle at 34% 32%,
+    #2f3a44 0%,
+    #14181c 62%,
+    #0b0a09 100%
+  );
 }
 
 .statusbar .sb-icons {
@@ -267,13 +279,31 @@
 
 /* Star White: near-uniform matte white glass in a thin, neutral steel rim */
 .preview-side[data-device='pad'] {
-  --duo-rim: linear-gradient(148deg, #f4f4f2 0%, #8e8d89 12%, #e4e3df 26%, #6e6d69 44%, #d6d5d1 60%, #7f7e7a 78%, #f0efec 100%);
+  --duo-rim: linear-gradient(
+    148deg,
+    #f4f4f2 0%,
+    #8e8d89 12%,
+    #e4e3df 26%,
+    #6e6d69 44%,
+    #d6d5d1 60%,
+    #7f7e7a 78%,
+    #f0efec 100%
+  );
 }
 
 /* Night Sky under a dark paper (the web build has no shell dark mode, so the
    article theme's appearance decides): deep navy glass, a darker polished rim */
 .preview-side[data-appearance='dark'][data-device='pad'] {
-  --duo-rim: linear-gradient(148deg, #a9b2c2 0%, #3b4250 12%, #7e8797 26%, #1b1f28 44%, #6d7686 60%, #2a303c 78%, #9aa3b3 100%);
+  --duo-rim: linear-gradient(
+    148deg,
+    #a9b2c2 0%,
+    #3b4250 12%,
+    #7e8797 26%,
+    #1b1f28 44%,
+    #6d7686 60%,
+    #2a303c 78%,
+    #9aa3b3 100%
+  );
 }
 
 .preview-side[data-device='pad'] .phone-stage {
@@ -288,8 +318,9 @@
   background: var(--duo-rim);
   box-shadow:
     var(--shadow-lg),
-    0 0 0 0.75px rgba(0, 0, 0, 0.35), /* where the metal meets the air */
-    inset 0 0 0 1px rgba(255, 255, 255, 0.45); /* the polished lip */
+    0 0 0 0.75px rgba(0, 0, 0, 0.35),
+    /* where the metal meets the air */ inset 0 0 0 1px
+      rgba(255, 255, 255, 0.45); /* the polished lip */
   height: auto;
   width: 100%;
   aspect-ratio: 16/10;

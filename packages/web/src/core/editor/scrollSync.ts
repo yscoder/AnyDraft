@@ -12,7 +12,7 @@ export interface ScrollSyncState {
    * 小数部分是「在这一行块内滚过的比例」—— 有了它预览才能连续跟随，
    * 而不是等整行翻过去才跳一次。
    */
-  position: number;
+  position: number
   /**
    * 编辑器滚到底时的 position。
    *
@@ -21,38 +21,43 @@ export interface ScrollSyncState {
    * 把「文末」当成一个虚拟锚点（endPosition → 预览最大滚动量），
    * 尾段就能连续插值过去，两端还正好对齐。
    */
-  endPosition: number;
+  endPosition: number
   /** 编辑器已滚到顶 / 底（用于边界精确对齐，避免插值误差留下缝隙） */
-  atTop: boolean;
-  atBottom: boolean;
+  atTop: boolean
+  atBottom: boolean
 }
 
 export interface ScrollSyncChannel {
   /** 当前状态（可变对象，读取时总是最新值） */
-  readonly state: ScrollSyncState;
+  readonly state: ScrollSyncState
   /** 编辑器侧：发布新位置并通知订阅者 */
-  publish(next: ScrollSyncState): void;
+  publish(next: ScrollSyncState): void
   /** 预览侧：订阅变化，返回取消订阅函数 */
-  subscribe(fn: () => void): () => void;
+  subscribe(fn: () => void): () => void
 }
 
 export function createScrollSyncChannel(): ScrollSyncChannel {
-  const state: ScrollSyncState = { position: 0, endPosition: 0, atTop: true, atBottom: false };
-  const listeners = new Set<() => void>();
+  const state: ScrollSyncState = {
+    position: 0,
+    endPosition: 0,
+    atTop: true,
+    atBottom: false,
+  }
+  const listeners = new Set<() => void>()
   return {
     state,
     publish(next) {
-      state.position = next.position;
-      state.endPosition = next.endPosition;
-      state.atTop = next.atTop;
-      state.atBottom = next.atBottom;
-      for (const fn of listeners) fn();
+      state.position = next.position
+      state.endPosition = next.endPosition
+      state.atTop = next.atTop
+      state.atBottom = next.atBottom
+      for (const fn of listeners) fn()
     },
     subscribe(fn) {
-      listeners.add(fn);
+      listeners.add(fn)
       return () => {
-        listeners.delete(fn);
-      };
+        listeners.delete(fn)
+      }
     },
-  };
+  }
 }

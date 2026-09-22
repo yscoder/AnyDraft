@@ -8,11 +8,11 @@ declare global {
   interface Window {
     /** File System Access API 的目录选择器（标准名，见 MDN） */
     showDirectoryPicker?: (options?: {
-      id?: string;
-      mode?: 'read' | 'readwrite';
-      startIn?: string;
-    }) => Promise<FileSystemDirectoryHandle>;
+      id?: string
+      mode?: 'read' | 'readwrite'
+      startIn?: string
+    }) => Promise<FileSystemDirectoryHandle>
   }
 }
 
-export {};
+export {}

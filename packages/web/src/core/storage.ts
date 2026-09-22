@@ -5,18 +5,18 @@
  */
 
 /** 当前命名空间 */
-const NS = 'anydraft';
+const NS = 'anydraft'
 
 function keyOf(name: string): string {
-  return `${NS}:${name}`;
+  return `${NS}:${name}`
 }
 
 /** 读偏好值 */
 export function readStored(name: string): string | null {
-  return localStorage.getItem(keyOf(name));
+  return localStorage.getItem(keyOf(name))
 }
 
 /** 写偏好值。配额超限时抛错，由调用方决定怎么提示 */
 export function writeStored(name: string, value: string): void {
-  localStorage.setItem(keyOf(name), value);
+  localStorage.setItem(keyOf(name), value)
 }

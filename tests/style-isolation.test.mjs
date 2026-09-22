@@ -16,17 +16,17 @@
  * 运行：npm test
  */
 
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { before, describe, it } from 'node:test';
-import { JSDOM } from 'jsdom';
-import { createServer } from 'vite';
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { before, describe, it } from 'node:test'
+import { JSDOM } from 'jsdom'
+import { createServer } from 'vite'
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
-const WEB = path.join(ROOT, 'packages/web');
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const ROOT = path.resolve(HERE, '..')
+const WEB = path.join(ROOT, 'packages/web')
 
 /**
  * 参与比对的属性。
@@ -66,7 +66,7 @@ const PROPS = [
   'list-style-position',
   'max-width',
   'width',
-];
+]
 
 /** 只有盒子里有文字时，字体与颜色类属性才可能影响渲染 */
 const TEXT_PROPS = new Set([
@@ -81,9 +81,9 @@ const TEXT_PROPS = new Set([
   'text-decoration-line',
   'white-space',
   'word-break',
-]);
+])
 
-const FIXTURE = readFileSync(path.join(HERE, 'fixtures/article.md'), 'utf8');
+const FIXTURE = readFileSync(path.join(HERE, 'fixtures/article.md'), 'utf8')
 
 /**
  * 预检：确认 preflight 里那些真正会影响正文的规则在 jsdom 下确实生效。
@@ -95,7 +95,7 @@ const RESET_PROBES = [
   { selector: 'sup', prop: 'vertical-align', expected: 'baseline' },
   { selector: 'sup', prop: 'position', expected: 'relative' },
   { selector: 'p', prop: 'box-sizing', expected: 'border-box' },
-];
+]
 
 /** 应用外壳的全局样式，对应 packages/web/src/styles.css 的 @layer base 与 html/body 规则。
  *  jsdom 解析不了 var() / oklch()，所以这里写成等价的字面值。 */
@@ -103,7 +103,7 @@ const APP_SHELL_CSS = `
   * { border-color: #e5e7eb; outline-color: #9ca3af; }
   html { line-height: 1.5; font-family: 'Figtree Variable', sans-serif; }
   body { font-family: 'Figtree Variable', sans-serif; color: #231f1c; }
-`;
+`
 
 /**
  * 读 Tailwind 真实的 preflight，而不是手抄一份（手抄的会随升级悄悄漂移）。
@@ -115,19 +115,19 @@ function normalizeForJsdom(css) {
   return css
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^([^{]*)\{/gm, (whole, selector) => {
-      if (selector.trim().startsWith('@')) return whole;
+      if (selector.trim().startsWith('@')) return whole
       const parts = selector
         .split(',')
         .map((s) => s.trim())
-        .filter((s) => s && !s.startsWith('::'));
-      return parts.length ? `${parts.join(', ')} {` : whole;
-    });
+        .filter((s) => s && !s.startsWith('::'))
+      return parts.length ? `${parts.join(', ')} {` : whole
+    })
 }
 
 function buildDocument(html, css) {
   return new JSDOM(
     `<!doctype html><html><head><style>${css}</style></head><body><div id="article">${html}</div></body></html>`,
-  );
+  )
 }
 
 /**
@@ -136,57 +136,67 @@ function buildDocument(html, css) {
  * 而不是靠一份会过期的黑名单。
  */
 function applies(prop, { display, position, inline, hasText }) {
-  if (TEXT_PROPS.has(prop) && !hasText) return false;
+  if (TEXT_PROPS.has(prop) && !hasText) return false
   // vertical-align 对块级盒子无效（块级图片的取值差异因此不算问题）
-  if (prop === 'vertical-align') return display !== 'block' && display !== 'flex' && display !== 'grid';
+  if (prop === 'vertical-align')
+    return display !== 'block' && display !== 'flex' && display !== 'grid'
   // 定位元素的偏移量只在非 static 下生效
-  if (prop === 'top') return position !== 'static' && position !== '';
+  if (prop === 'top') return position !== 'static' && position !== ''
   // 盒模型只在元素自己设了宽度时才可能改变盒子大小
-  if (prop === 'box-sizing') return /(^|;)\s*width\s*:/.test(inline);
-  return true;
+  if (prop === 'box-sizing') return /(^|;)\s*width\s*:/.test(inline)
+  return true
 }
 
 /** 逐个元素的计算样式快照，两套文档用同一套顺序，按下标配对 */
 function snapshot(dom) {
-  const doc = dom.window.document;
+  const doc = dom.window.document
   return [...doc.querySelectorAll('#article *')].map((el) => {
-    const cs = dom.window.getComputedStyle(el);
+    const cs = dom.window.getComputedStyle(el)
     const ctx = {
       display: cs.getPropertyValue('display'),
       position: cs.getPropertyValue('position'),
       inline: el.getAttribute('style') ?? '',
       hasText: el.textContent.trim() !== '',
-    };
-    const rec = { tag: el.tagName.toLowerCase() };
-    for (const p of PROPS) rec[p] = applies(p, ctx) ? normalizeValue(cs.getPropertyValue(p)) : null;
-    return rec;
-  });
+    }
+    const rec = { tag: el.tagName.toLowerCase() }
+    for (const p of PROPS)
+      rec[p] = applies(p, ctx) ? normalizeValue(cs.getPropertyValue(p)) : null
+    return rec
+  })
 }
 
 /** jsdom 对同一个零值会给出 "0px" 与 "0" 两种写法，比之前先归一 */
 function normalizeValue(v) {
-  return typeof v === 'string' && /^-?(0(?:\.0+)?)(px|em|rem|pt|%)$/.test(v) ? '0' : v;
+  return typeof v === 'string' && /^-?(0(?:\.0+)?)(px|em|rem|pt|%)$/.test(v)
+    ? '0'
+    : v
 }
 
 /** 两套快照的差异。同一处差异在几十个元素上重复出现，按 tag+属性 去重后再报 */
 function diff(inApp, inBare) {
-  assert.equal(inApp.length, inBare.length, '两套文档的元素数量不一致');
-  const seen = new Map();
+  assert.equal(inApp.length, inBare.length, '两套文档的元素数量不一致')
+  const seen = new Map()
   for (let i = 0; i < inApp.length; i++) {
-    const a = inApp[i];
-    const b = inBare[i];
+    const a = inApp[i]
+    const b = inBare[i]
     for (const p of PROPS) {
-      if (a[p] === b[p]) continue;
-      const key = `${a.tag}.${p}`;
-      if (!seen.has(key)) seen.set(key, { tag: a.tag, prop: p, inApp: a[p], inBare: b[p] });
+      if (a[p] === b[p]) continue
+      const key = `${a.tag}.${p}`
+      if (!seen.has(key))
+        seen.set(key, {
+          tag: a.tag,
+          prop: p,
+          inApp: a[p],
+          inBare: b[p],
+        })
     }
   }
-  return [...seen.values()];
+  return [...seen.values()]
 }
 
-let renderArticle;
-let themes;
-let getDensity;
+let renderArticle
+let themes
+let getDensity
 
 before(async () => {
   // 复用项目自己的 Vite 配置来加载 TS 渲染器：@/ 别名、依赖解析都不必在
@@ -200,53 +210,74 @@ before(async () => {
     appType: 'custom',
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { middlewareMode: true },
-  });
+  })
   try {
-    const md = await server.ssrLoadModule('/src/core/markdown/markdown.ts');
-    const theme = await server.ssrLoadModule('/src/core/theme/theme.ts');
-    renderArticle = md.renderArticle;
-    themes = theme.themes;
-    getDensity = theme.getDensity;
+    const md = await server.ssrLoadModule('/src/core/markdown/markdown.ts')
+    const theme = await server.ssrLoadModule('/src/core/theme/theme.ts')
+    renderArticle = md.renderArticle
+    themes = theme.themes
+    getDensity = theme.getDensity
   } finally {
-    await server.close();
+    await server.close()
   }
-});
+})
 
 describe('正文样式不依赖应用全局样式', () => {
   it('全局重置在测试环境里确实生效（预检）', () => {
-    const css = normalizeForJsdom(readFileSync(path.join(ROOT, 'node_modules/tailwindcss/preflight.css'), 'utf8'));
-    const dom = buildDocument('<ul><li>x</li></ul><sup>1</sup><p>x</p>', css);
+    const css = normalizeForJsdom(
+      readFileSync(
+        path.join(ROOT, 'node_modules/tailwindcss/preflight.css'),
+        'utf8',
+      ),
+    )
+    const dom = buildDocument('<ul><li>x</li></ul><sup>1</sup><p>x</p>', css)
     for (const { selector, prop, expected } of RESET_PROBES) {
       const actual = dom.window
         .getComputedStyle(dom.window.document.querySelector(selector))
-        .getPropertyValue(prop);
-      assert.equal(actual, expected, `preflight 的 ${selector} { ${prop} } 未生效，主测试会假绿`);
+        .getPropertyValue(prop)
+      assert.equal(
+        actual,
+        expected,
+        `preflight 的 ${selector} { ${prop} } 未生效，主测试会假绿`,
+      )
     }
-  });
+  })
 
   it('同一份 HTML 在应用环境里与在干净环境里计算样式完全一致', () => {
     const appCss =
-      normalizeForJsdom(readFileSync(path.join(ROOT, 'node_modules/tailwindcss/preflight.css'), 'utf8')) +
-      APP_SHELL_CSS;
-    const density = getDensity('standard');
+      normalizeForJsdom(
+        readFileSync(
+          path.join(ROOT, 'node_modules/tailwindcss/preflight.css'),
+          'utf8',
+        ),
+      ) + APP_SHELL_CSS
+    const density = getDensity('standard')
 
-    const failures = [];
+    const failures = []
     for (const theme of themes) {
-      const { html } = renderArticle(FIXTURE, theme, {}, density);
-      const found = diff(snapshot(buildDocument(html, appCss)), snapshot(buildDocument(html, '')));
-      if (found.length) failures.push({ theme: theme.id, found });
+      const { html } = renderArticle(FIXTURE, theme, {}, density)
+      const found = diff(
+        snapshot(buildDocument(html, appCss)),
+        snapshot(buildDocument(html, '')),
+      )
+      if (found.length) failures.push({ theme: theme.id, found })
     }
 
     if (failures.length) {
-      const lines = ['以下属性在「应用环境」与「导出环境」取值不同，即渲染器把它们交给了外部环境兜底：', ''];
+      const lines = [
+        '以下属性在「应用环境」与「导出环境」取值不同，即渲染器把它们交给了外部环境兜底：',
+        '',
+      ]
       for (const { theme, found } of failures) {
-        lines.push(`  [${theme}]`);
+        lines.push(`  [${theme}]`)
         for (const d of found) {
-          lines.push(`    <${d.tag}> ${d.prop}: 预览=${JSON.stringify(d.inApp)} 导出=${JSON.stringify(d.inBare)}`);
+          lines.push(
+            `    <${d.tag}> ${d.prop}: 预览=${JSON.stringify(d.inApp)} 导出=${JSON.stringify(d.inBare)}`,
+          )
         }
-        lines.push('');
+        lines.push('')
       }
-      assert.fail(lines.join('\n'));
+      assert.fail(lines.join('\n'))
     }
-  });
-});
+  })
+})

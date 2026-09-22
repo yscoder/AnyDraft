@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -7,28 +7,28 @@ import {
   FileText,
   ImageIcon,
   Upload,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { TooltipHint } from '@/components/ui/tooltip';
+} from '@/components/ui/dropdown-menu'
+import { TooltipHint } from '@/components/ui/tooltip'
 interface Props {
-  onCopy: () => void;
+  onCopy: () => void
   /** 导入 .md / .zip 备份 */
-  onImport: (files: File[]) => void;
+  onImport: (files: File[]) => void
   /** 导出当前草稿为 .md */
-  onExportMarkdown: () => void;
+  onExportMarkdown: () => void
   /** 导出全部草稿 + 图片为 zip 备份 */
-  onExportBackup: () => void;
+  onExportBackup: () => void
   /** 导出正文长图 PNG */
-  onExportImage: () => void;
+  onExportImage: () => void
   /** 导出进行中：禁用菜单，避免重复触发 */
-  exporting: boolean;
+  exporting: boolean
 }
 
 export default function Toolbar({
@@ -39,7 +39,7 @@ export default function Toolbar({
   onExportImage,
   exporting,
 }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null)
 
   return (
     <div className="flex items-center gap-2 justify-self-end min-w-0 max-[700px]:gap-1">
@@ -51,9 +51,9 @@ export default function Toolbar({
         accept=".md,.markdown,.txt,.zip"
         hidden
         onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          if (files.length) onImport(files);
-          e.target.value = ''; // 同一文件连选两次也要触发
+          const files = Array.from(e.target.files ?? [])
+          if (files.length) onImport(files)
+          e.target.value = '' // 同一文件连选两次也要触发
         }}
       />
       <TooltipHint content="导入 Markdown 文件或备份包">
@@ -70,10 +70,20 @@ export default function Toolbar({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" disabled={exporting} aria-label={exporting ? '导出中' : '导出'}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting}
+            aria-label={exporting ? '导出中' : '导出'}
+          >
             <Download data-icon="inline-start" />
-            <span className="max-[700px]:hidden">{exporting ? '导出中…' : '导出'}</span>
-            <ChevronDown className="max-[700px]:hidden" data-icon="inline-end" />
+            <span className="max-[700px]:hidden">
+              {exporting ? '导出中…' : '导出'}
+            </span>
+            <ChevronDown
+              className="max-[700px]:hidden"
+              data-icon="inline-end"
+            />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-52">
@@ -89,7 +99,9 @@ export default function Toolbar({
           <DropdownMenuItem onSelect={onExportBackup}>
             <Archive />
             全部备份 .zip
-            <span className="ml-auto text-xs text-muted-foreground">草稿 + 图片</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              草稿 + 图片
+            </span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -99,5 +111,5 @@ export default function Toolbar({
         <span className="max-[700px]:hidden">复制到公众号</span>
       </Button>
     </div>
-  );
+  )
 }

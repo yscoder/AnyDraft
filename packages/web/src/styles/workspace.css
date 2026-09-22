@@ -22,7 +22,9 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  transition: box-shadow 0.25s var(--ease), border-color 0.25s var(--ease);
+  transition:
+    box-shadow 0.25s var(--ease),
+    border-color 0.25s var(--ease);
 }
 
 .workspace-panel:hover {
@@ -45,17 +47,6 @@
   justify-self: start;
 }
 
-.workspace-mode-switch {
-  background: var(--background);
-}
-
-.split {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
 /* shadcn Resizable 分隔条：保留贯穿分界线和中部把手 */
 .workspace-resize-handle {
   z-index: 5;
@@ -67,7 +58,10 @@
   height: 44px;
   border-radius: 999px;
   background: rgba(60, 54, 44, 0.18);
-  transition: height 0.16s var(--ease), background 0.16s var(--ease), box-shadow 0.16s var(--ease);
+  transition:
+    height 0.16s var(--ease),
+    background 0.16s var(--ease),
+    box-shadow 0.16s var(--ease);
 }
 
 .workspace-resize-handle:hover > div,
@@ -79,11 +73,4 @@
 
 .workspace.mode-preview .workspace-resize-handle {
   display: none;
-}
-
-.editor-panel,
-.preview-panel {
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
 }
