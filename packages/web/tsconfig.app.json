@@ -14,7 +14,8 @@
     "jsx": "react-jsx",
 
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#app-runtime": ["./src/core/runtime/browserRuntime.ts"]
     },
 
     "strict": true,

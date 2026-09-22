@@ -281,3 +281,21 @@ describe('正文样式不依赖应用全局样式', () => {
     }
   })
 })
+
+describe('正文 HTML 安全边界', () => {
+  it('移除脚本、事件属性和危险 URL，同时保留安全的内联 HTML', () => {
+    const { body } = renderArticle(`
+<script>alert(1)</script>
+<iframe src="https://example.com"></iframe>
+<img src="x" onerror="alert(1)" style="background:url(javascript:alert(1))">
+<a href="javascript:alert(1)" onclick="alert(1)">危险链接</a>
+<a href="data:text/html,alert(1)">数据链接</a>
+<img src="data:image/png;base64,AA==" alt="安全图片">
+<div style="color: red">安全内容</div>
+`)
+    assert.doesNotMatch(body, /<script|<iframe|onerror|onclick|javascript:/i)
+    assert.doesNotMatch(body, /data:text\/html/i)
+    assert.match(body, /<div style="color:\s*red">安全内容<\/div>/)
+    assert.match(body, /src="data:image\/png;base64,AA=="/)
+  })
+})

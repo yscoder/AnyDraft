@@ -3,7 +3,7 @@
  *
  * 用户通过 showDirectoryPicker 授权一个真实目录，此后所有草稿（.md）
  * 与图片都直接读写该目录下的真实文件，与磁盘完全同构。桌面端（Tauri）
- * 未来用原生文件系统实现同一个 ContentRepository 接口即可复用全部 UI。
+ * 用原生文件系统实现同一个 ContentRepository 接口并复用全部 UI。
  */
 
 import type {

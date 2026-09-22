@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "稿域跨运行时纯逻辑：领域类型与 ZIP 编解码（未来包含 ContentRepository 接口与契约测试）",
+  "description": "稿域跨运行时类型、内容仓库接口与 ZIP 编解码",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

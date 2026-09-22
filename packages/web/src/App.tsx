@@ -43,9 +43,8 @@ import {
 } from '@/core/markdown/markdown'
 import { copyRichText } from '@/core/transfer/clipboard'
 import {
-  downloadBlob,
-  exportBackupZip,
-  exportDraftMarkdown,
+  createBackupZipBlob,
+  createDraftMarkdownBlob,
   importFiles,
   safeFileName,
 } from '@/core/transfer/exchange'
@@ -54,21 +53,15 @@ import { getDensity, getTheme } from '@/core/theme/theme'
 import { downscaleImage } from '@/core/image/images'
 import { createScrollSyncChannel } from '@/core/editor/scrollSync'
 import { locateImage } from '@/core/drafts/locate'
-import {
-  baseNamePath,
-  canPickDirectory,
-  canUseStorage,
-  dataUrlToBlob,
-  dirnamePath,
-  getOpfsRoot,
-  pickRootDirectory,
-  queryRootPermission,
-  requestRootPermission,
-  FsaRepository,
-} from '@/core/fs/fsa'
-import { loadRootHandle, saveRootHandle } from '@/core/fs/handleStore'
-import type { ContentRepository, Draft, RepoNode } from '@any-draft/shared'
+import { baseNamePath, dataUrlToBlob, dirnamePath } from '@/core/fs/fsa'
+import type {
+  AppRuntime,
+  ContentRepository,
+  Draft,
+  RepoNode,
+} from '@any-draft/shared'
 import { readStored, writeStored } from '@/core/storage'
+import { createRuntime } from '@/core/runtime/createRuntime'
 import './styles/index.css'
 
 /** 编辑器侧最小宽度（拖拽时保留，预览因此可达 desktop 宽度） */
@@ -87,7 +80,12 @@ interface Confirmation {
 
 /** 工作目录授权状态机 */
 type RepoStatus =
-  'checking' | 'unsupported' | 'need-pick' | 'need-permission' | 'ready'
+  | 'checking'
+  | 'unsupported'
+  | 'need-pick'
+  | 'need-permission'
+  | 'ready'
+  | 'error'
 
 function stamp(): string {
   const d = new Date()
@@ -98,9 +96,10 @@ function stamp(): string {
 export default function App() {
   /* ---------------- 工作目录（平台适配层） ---------------- */
   const [repoStatus, setRepoStatus] = useState<RepoStatus>('checking')
+  const runtimeRef = useRef<AppRuntime | null>(null)
   const repoRef = useRef<ContentRepository | null>(null)
   const [pendingName, setPendingName] = useState('')
-  const pendingHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
+  const [repoError, setRepoError] = useState('')
   const [rootName, setRootName] = useState('')
 
   const [nodes, setNodes] = useState<RepoNode[]>([])
@@ -128,6 +127,7 @@ export default function App() {
   const isPreviewOnly = viewMode === 'preview'
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [saved, setSaved] = useState(true)
+  const [saveFailed, setSaveFailed] = useState(false)
   const [isNarrow, setIsNarrow] = useState(
     () => window.matchMedia('(max-width: 900px)').matches,
   )
@@ -266,22 +266,26 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      if (!canUseStorage()) {
-        setRepoStatus('unsupported')
-        return
-      }
-      const handle = await loadRootHandle()
-      if (cancelled) return
-      if (!handle) {
-        setRepoStatus('need-pick')
-        return
-      }
-      if (await queryRootPermission(handle)) {
-        await openRepo(handle)
-      } else {
-        pendingHandleRef.current = handle
-        setPendingName(handle.name)
-        setRepoStatus('need-permission')
+      try {
+        const runtime = await createRuntime()
+        runtimeRef.current = runtime
+        const startup = await runtime.initializeRepository()
+        if (cancelled) return
+        if (startup.status === 'ready') {
+          await openRepo(startup.repository)
+        } else if (startup.status === 'need-permission') {
+          setPendingName(startup.rootName)
+          setRepoStatus('need-permission')
+        } else {
+          setRepoStatus(startup.status)
+        }
+      } catch (err) {
+        if (cancelled) return
+        console.error('初始化运行时失败', err)
+        setRepoError(
+          err instanceof Error ? err.message : '应用运行时初始化失败',
+        )
+        setRepoStatus('error')
       }
     })()
     return () => {
@@ -329,8 +333,7 @@ export default function App() {
     writeStored('active-file', path)
   }
 
-  const openRepo = async (handle: FileSystemDirectoryHandle): Promise<void> => {
-    const repo = new FsaRepository(handle)
+  const openRepo = async (repo: ContentRepository): Promise<void> => {
     repoRef.current = repo
     setRootName(repo.rootName || '浏览器内置存储')
     const mdPaths = await scanRepo(repo)
@@ -338,7 +341,6 @@ export default function App() {
     const restored =
       savedPath && mdPaths.includes(savedPath) ? savedPath : (mdPaths[0] ?? '')
     setActiveFile(restored)
-    await saveRootHandle(handle)
     setRepoStatus('ready')
   }
 
@@ -367,23 +369,39 @@ export default function App() {
     const disk = diskContentsRef.current[path] ?? ''
     if (markdown === disk) {
       setSaved(true)
+      setSaveFailed(false)
       return
     }
     setSaved(false)
+    setSaveFailed(false)
+    let started = false
     const timer = window.setTimeout(() => {
+      started = true
       const toWrite = markdown
       void repo
         .writeTextFile(path, toWrite)
         .then(() => {
           diskContentsRef.current[path] = toWrite
-          setSaved(true)
+          if (activePathRef.current === path) {
+            setSaved(true)
+            setSaveFailed(false)
+          }
         })
         .catch(() => {
           flash('保存失败，请检查目录写入权限', 'error')
-          setSaved(true)
+          if (activePathRef.current === path) setSaveFailed(true)
         })
     }, 300)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      if (started || diskContentsRef.current[path] === markdown) return
+      void repo
+        .writeTextFile(path, markdown)
+        .then(() => {
+          diskContentsRef.current[path] = markdown
+        })
+        .catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markdown, activePath, repoStatus])
 
@@ -420,11 +438,13 @@ export default function App() {
 
   /* ---------------- 工作目录授权动作 ---------------- */
   const handlePickRoot = async () => {
-    const handle = await pickRootDirectory()
-    if (!handle) return
+    const runtime = runtimeRef.current
+    if (!runtime) return
     try {
-      await openRepo(handle)
-      flash(`已连接目录「${handle.name}」`, 'success')
+      const repo = await runtime.pickRepository()
+      if (!repo) return
+      await openRepo(repo)
+      flash(`已连接目录「${repo.rootName}」`, 'success')
     } catch (err) {
       console.warn('打开目录失败', err)
       flash('目录打开失败', 'error')
@@ -432,14 +452,15 @@ export default function App() {
   }
 
   const handleGrantPermission = async () => {
-    const handle = pendingHandleRef.current
-    if (!handle) {
+    const runtime = runtimeRef.current
+    if (!runtime) {
       setRepoStatus('need-pick')
       return
     }
-    if (await requestRootPermission(handle)) {
+    const repo = await runtime.grantRepositoryPermission()
+    if (repo) {
       try {
-        await openRepo(handle)
+        await openRepo(repo)
       } catch (err) {
         console.warn('打开目录失败', err)
         flash('目录打开失败', 'error')
@@ -450,16 +471,16 @@ export default function App() {
   }
 
   const handleChangeRoot = () => {
-    pendingHandleRef.current = null
     setPendingName('')
     setRepoStatus('need-pick')
   }
 
   /** 目录选择器不可用时的兜底：改用浏览器内置存储（OPFS） */
   const handleUseOpfs = async () => {
+    const runtime = runtimeRef.current
+    if (!runtime) return
     try {
-      const handle = await getOpfsRoot()
-      await openRepo(handle)
+      await openRepo(await runtime.openInternalStorage())
       flash('已使用浏览器内置存储', 'success')
     } catch (err) {
       console.warn('打开内置存储失败', err)
@@ -703,10 +724,20 @@ export default function App() {
     )
   }
 
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = async () => {
     if (!activeDraft) return
-    exportDraftMarkdown(activeDraft)
-    flash(`已导出「${activeDraft.name}」`, 'success')
+    const runtime = runtimeRef.current
+    if (!runtime) return
+    try {
+      const saved = await runtime.exportFile(
+        `${safeFileName(activeDraft.name)}.md`,
+        createDraftMarkdownBlob(activeDraft),
+      )
+      if (saved) flash(`已导出「${activeDraft.name}」`, 'success')
+    } catch (err) {
+      console.warn('Markdown 导出失败', err)
+      flash('Markdown 导出失败', 'error')
+    }
   }
 
   const handleExportBackup = async () => {
@@ -723,11 +754,15 @@ export default function App() {
           }),
         )
       }
-      await exportBackupZip(draftsForLocate, imagesData)
-      flash(
-        `已导出备份（${draftsForLocate.length} 篇草稿 · ${imageNodes.length} 张图片）`,
-        'success',
-      )
+      const runtime = runtimeRef.current
+      if (!runtime) return
+      const blob = await createBackupZipBlob(draftsForLocate, imagesData)
+      const saved = await runtime.exportFile(`稿域备份-${stamp()}.zip`, blob)
+      if (saved)
+        flash(
+          `已导出备份（${draftsForLocate.length} 篇草稿 · ${imageNodes.length} 张图片）`,
+          'success',
+        )
     } catch (err) {
       console.warn('备份失败', err)
       flash('备份导出失败', 'error')
@@ -743,8 +778,13 @@ export default function App() {
       const dataUrls = await resolveImageDataUrls(markdown)
       const { body } = renderArticle(markdown, theme, dataUrls, density)
       const blob = await renderLongImage({ body, theme, author: '稿域' })
-      downloadBlob(`${safeFileName(activeDraft?.name ?? '长图')}.png`, blob)
-      flash('长图已导出', 'success')
+      const runtime = runtimeRef.current
+      if (!runtime) return
+      const saved = await runtime.exportFile(
+        `${safeFileName(activeDraft?.name ?? '长图')}.png`,
+        blob,
+      )
+      if (saved) flash('长图已导出', 'success')
     } catch (err) {
       console.warn('长图导出失败', err)
       flash(err instanceof Error ? err.message : '长图导出失败', 'error')
@@ -811,7 +851,16 @@ export default function App() {
         <div className="w-[min(420px,100%)] flex flex-col gap-3.5 pt-[30px] px-7 pb-6 bg-[var(--panel-solid,#fffdf9)] border border-border rounded-2xl shadow-[0_24px_60px_-30px_rgba(60,54,44,0.25)]">
           <Brand />
 
-          {repoStatus === 'unsupported' ? (
+          {repoStatus === 'error' ? (
+            <>
+              <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">
+                应用启动失败
+              </h1>
+              <p className="m-0 text-[13px] leading-[1.7] text-muted-foreground">
+                {repoError || '请重新启动应用后再试。'}
+              </p>
+            </>
+          ) : repoStatus === 'unsupported' ? (
             <>
               <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">
                 当前浏览器暂不支持
@@ -844,7 +893,7 @@ export default function App() {
             </>
           ) : repoStatus === 'need-pick' ? (
             <>
-              {canPickDirectory() ? (
+              {runtimeRef.current?.canPickRepository() ? (
                 <>
                   <h1 className="mt-1 text-[17px] font-[650] tracking-[0.2px] text-foreground">
                     选择你的工作目录
@@ -858,12 +907,14 @@ export default function App() {
                     <Button size="lg" onClick={() => void handlePickRoot()}>
                       打开目录
                     </Button>
-                    <button
-                      className="self-center border-none bg-transparent text-xs text-muted-foreground cursor-pointer underline underline-offset-[3px] hover:text-[var(--accent-strong)]"
-                      onClick={() => void handleUseOpfs()}
-                    >
-                      改用浏览器内置存储
-                    </button>
+                    {runtimeRef.current?.canUseInternalStorage() ? (
+                      <button
+                        className="self-center border-none bg-transparent text-xs text-muted-foreground cursor-pointer underline underline-offset-[3px] hover:text-[var(--accent-strong)]"
+                        onClick={() => void handleUseOpfs()}
+                      >
+                        改用浏览器内置存储
+                      </button>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -956,7 +1007,7 @@ export default function App() {
               <Toolbar
                 onCopy={() => void handleCopy()}
                 onImport={handleImport}
-                onExportMarkdown={handleExportMarkdown}
+                onExportMarkdown={() => void handleExportMarkdown()}
                 onExportBackup={() => void handleExportBackup()}
                 onExportImage={() => void handleExportImage()}
                 exporting={exporting}
@@ -1037,8 +1088,10 @@ export default function App() {
                 >
                   <span className={countClass}>{charCount} 字</span>
                 </TooltipHint>
-                <span className="pane-stat save-state">
-                  {saved ? '已保存' : '保存中'}
+                <span
+                  className={`pane-stat save-state ${saveFailed ? 'text-destructive' : ''}`}
+                >
+                  {saveFailed ? '保存失败' : saved ? '已保存' : '保存中'}
                 </span>
               </div>
               <ThemeControls

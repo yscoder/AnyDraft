@@ -9,9 +9,15 @@
   "scripts": {
     "dev": "npm run dev -w @any-draft/web",
     "build": "npm run build -w @any-draft/web",
+    "tauri:dev": "npm run dev -w @any-draft/desktop",
+    "tauri:build": "npm run build -w @any-draft/desktop",
+    "tauri:build:macos": "npm run build:macos -w @any-draft/desktop",
+    "tauri:build:windows": "npm run build:windows -w @any-draft/desktop",
     "preview": "npm run preview -w @any-draft/web",
     "deploy": "npm run deploy -w @any-draft/web",
-    "check": "npm run check --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present && npm run check:rust",
+    "check:rust": "cargo check --manifest-path packages/desktop/src-tauri/Cargo.toml",
+    "test:rust": "cargo test --manifest-path packages/desktop/src-tauri/Cargo.toml",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "稿域主窗口的最小核心权限",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

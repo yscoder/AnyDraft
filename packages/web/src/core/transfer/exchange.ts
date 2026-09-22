@@ -1,8 +1,7 @@
 /**
- * 导入 / 导出：把草稿与图片库搬进搬出浏览器。
+ * 导入 / 导出编解码：把草稿与图片打包或解析为跨平台数据。
  *
- * 正常写作时数据只躺在 localStorage（草稿）与 IndexedDB（图片）里，
- * 换电脑、清缓存就全没了。这里提供两条通路：
+ * 实际保存位置由 ContentRepository 和 AppRuntime 决定。这里提供两条通路：
  * - 单篇 `.md`：给外部工具用，纯文本，图片引用保持 `![[名字]]`
  * - 全量 `.zip`：草稿 + 图片原始文件 + manifest.json，可以完整导回
  */
@@ -55,19 +54,6 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/avif': 'avif',
 }
 
-/** 触发浏览器下载 */
-export function downloadBlob(filename: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  // 立即 revoke 在部分浏览器上会打断下载，推迟一轮
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
 /** 文件名安全化：去掉路径分隔符等非法字符 */
 export function safeFileName(name: string): string {
   const cleaned = name
@@ -76,12 +62,6 @@ export function safeFileName(name: string): string {
     .trim()
     .replace(/^\.+/, '')
   return cleaned || '未命名'
-}
-
-/** `YYYYMMDD-HHmm`，用于备份文件名 */
-function stamp(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
 }
 
 /* ---------------- data URI ⇄ 字节 ---------------- */
@@ -129,22 +109,21 @@ function imageFileName(name: string, mime: string): string {
 
 /* ---------------- 导出 ---------------- */
 
-/** 导出单篇草稿为 .md */
-export function exportDraftMarkdown(draft: Draft): void {
-  const blob = new Blob([draft.content], {
+/** 把单篇草稿编码为可交给平台保存的 Markdown Blob。 */
+export function createDraftMarkdownBlob(draft: Draft): Blob {
+  return new Blob([draft.content], {
     type: 'text/markdown;charset=utf-8',
   })
-  downloadBlob(`${safeFileName(draft.name)}.md`, blob)
 }
 
 /**
  * 导出全量备份 zip。
  * 草稿文件名带序号前缀，保证解压后顺序与列表一致、且重名不互相覆盖。
  */
-export async function exportBackupZip(
+export async function createBackupZipBlob(
   drafts: Draft[],
   images: Record<string, string>,
-): Promise<void> {
+): Promise<Blob> {
   const enc = new TextEncoder()
   const entries: ZipEntry[] = []
   const manifest: Manifest = {
@@ -177,8 +156,7 @@ export async function exportBackupZip(
     name: MANIFEST,
     data: enc.encode(JSON.stringify(manifest, null, 2)),
   })
-  const blob = await createZip(entries)
-  downloadBlob(`稿域备份-${stamp()}.zip`, blob)
+  return createZip(entries)
 }
 
 /* ---------------- 导入 ---------------- */

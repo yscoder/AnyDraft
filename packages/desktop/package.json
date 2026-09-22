@@ -1,7 +1,28 @@
 {
   "name": "@any-draft/desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "description": "稿域桌面端（Tauri 2）壳包：规划中、暂未实现，见 README 与 docs/TAURI_DESKTOP_MIGRATION_PLAN.md"
+  "description": "稿域桌面端（Tauri 2）运行时与原生文件系统适配器",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc -p .",
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:macos": "tauri build --target aarch64-apple-darwin --bundles app,dmg",
+    "build:windows": "tauri build --target x86_64-pc-windows-msvc --bundles nsis"
+  },
+  "dependencies": {
+    "@any-draft/shared": "*",
+    "@tauri-apps/api": "^2.8.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.0",
+    "typescript": "~7.0.2"
+  }
 }

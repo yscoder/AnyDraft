@@ -46,6 +46,17 @@ npm run dev
 
 根据终端输出打开本地开发地址。
 
+### 桌面端开发
+
+桌面端额外需要 Rust 和对应平台的 Tauri 系统依赖。安装依赖后运行：
+
+```bash
+npm run tauri:dev
+```
+
+桌面端与 Web 端复用同一套界面和功能。首次启动需要选择工作目录，之后会自动重开
+最近一次使用的目录；所有 Markdown、图片和子目录都直接保存在该目录中。
+
 ## 基本使用
 
 ### 管理工作区
@@ -83,13 +94,14 @@ npm run dev
 packages/
 ├── shared/    @any-draft/shared   领域类型、仓储接口与 ZIP 编解码
 ├── web/       @any-draft/web      Web 应用、编辑器、渲染与浏览器存储适配器
-└── desktop/   @any-draft/desktop  Tauri 桌面端占位包，尚未实现
+└── desktop/   @any-draft/desktop  Tauri 2 桌面运行时与原生文件系统实现
 
 scripts/                           仓库维护脚本
 tests/                             自动化测试与测试素材
 ```
 
-`web` 是当前唯一可运行的前端应用。未来桌面端计划通过 Tauri WebView 复用同一套界面，并使用原生文件系统适配器。
+`web` 提供共享 React 界面和 Web 平台适配器；`desktop` 通过 Tauri WebView 复用界面，
+并以受限 Rust commands 实现原生文件系统操作。
 
 ## 架构概览
 
@@ -97,10 +109,14 @@ tests/                             自动化测试与测试素材
 React UI / CodeMirror / Markdown 渲染 / 导入导出
                          │
                  ContentRepository
-                         │
-              File System Access API
-                  或浏览器 OPFS
+                  /             \
+    File System Access API     Tauri commands
+       或浏览器 OPFS               │
+                              原生文件系统
 ```
+
+构建时由 `import.meta.env.VITE_APP_RUNTIME` 固定选择 `web` 或 `tauri` 适配器；
+运行中不会静默切换存储后端。
 
 ## 技术栈
 
@@ -112,6 +128,7 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
 - CodeMirror 6
 - markdown-it
 - highlight.js
+- Tauri 2 与 Rust
 - npm workspaces
 
 ## 开发命令
@@ -122,6 +139,9 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
 | --- | --- |
 | `npm run dev` | 启动 Web 开发服务器 |
 | `npm run build` | 类型检查并构建 Web 应用 |
+| `npm run tauri:dev` | 启动 Tauri 桌面开发环境 |
+| `npm run tauri:build:macos` | 构建 macOS arm64 `.app` / `.dmg` |
+| `npm run tauri:build:windows` | 构建 Windows x64 NSIS 安装程序 |
 | `npm run preview` | 预览生产构建 |
 | `npm run check` | 检查所有 workspace 的 TypeScript 类型 |
 | `npm test` | 运行自动化测试 |
@@ -154,7 +174,12 @@ npm run deploy
 
 ## 桌面端
 
-桌面客户端目前仍处于规划阶段，`packages/desktop` 仅为占位包，仓库暂不提供桌面安装程序。
+桌面客户端生产目标为 Windows x64 与 macOS arm64，最低建议系统分别为 Windows 10
+和 macOS 11。当前仓库提供构建配置，但没有提交签名证书，也没有启用自动更新：
+macOS 本地构建使用 ad-hoc 签名，Windows 本地构建为未签名安装程序。
+
+正式外部分发前需要配置 macOS Developer ID 签名与公证，以及 Windows 代码签名；
+未签名产物可能被系统安全机制拦截或显示警告。
 
 ## 许可
 

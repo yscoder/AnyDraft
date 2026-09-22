@@ -46,32 +46,45 @@ function vendorChunk(id: string): string | undefined {
   return undefined
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+export default defineConfig(({ mode }) => {
+  const runtime = mode === 'tauri' ? 'tauri' : 'web'
+  return {
+    plugins: [react(), tailwindcss()],
+    define: {
+      'import.meta.env.VITE_APP_RUNTIME': JSON.stringify(runtime),
     },
-  },
-  // monorepo：@any-draft/shared 通过 workspace 符号链接解析到 packages/shared，
-  // 开发服务器需要放行根目录；链接包保持源码形态、不做依赖预打包
-  server: {
-    port: 28080,
-    fs: {
-      allow: [path.resolve(__dirname, '../..')],
+    resolve: {
+      alias: [
+        {
+          find: '#app-runtime',
+          replacement:
+            runtime === 'tauri'
+              ? path.resolve(__dirname, '../desktop/src/runtime.ts')
+              : path.resolve(__dirname, './src/core/runtime/browserRuntime.ts'),
+        },
+        { find: '@', replacement: path.resolve(__dirname, './src') },
+      ],
     },
-  },
-  optimizeDeps: {
-    exclude: ['@any-draft/shared'],
-  },
-  base: './',
-  build: {
-    chunkSizeWarningLimit: 400,
-    rollupOptions: {
-      output: {
-        manualChunks: (id) =>
-          id.includes('node_modules') ? vendorChunk(id) : undefined,
+    // monorepo：workspace 包以源码形式解析，开发服务器需放行仓库根目录。
+    server: {
+      port: 28080,
+      strictPort: true,
+      fs: {
+        allow: [path.resolve(__dirname, '../..')],
       },
     },
-  },
+    optimizeDeps: {
+      exclude: ['@any-draft/shared', '@any-draft/desktop'],
+    },
+    base: './',
+    build: {
+      chunkSizeWarningLimit: 400,
+      rollupOptions: {
+        output: {
+          manualChunks: (id) =>
+            id.includes('node_modules') ? vendorChunk(id) : undefined,
+        },
+      },
+    },
+  }
 })
