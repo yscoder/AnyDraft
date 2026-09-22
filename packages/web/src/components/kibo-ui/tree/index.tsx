@@ -57,6 +57,8 @@ const useTreeNode = () => {
 export type TreeProviderProps = {
   children: ReactNode;
   defaultExpandedIds?: string[];
+  expandedIds?: string[];
+  onExpandedChange?: (expandedIds: string[]) => void;
   showLines?: boolean;
   showIcons?: boolean;
   selectable?: boolean;
@@ -70,6 +72,8 @@ export type TreeProviderProps = {
 export const TreeProvider = ({
   children,
   defaultExpandedIds = [],
+  expandedIds: controlledExpandedIds,
+  onExpandedChange,
   showLines = true,
   showIcons = true,
   selectable = true,
@@ -79,9 +83,12 @@ export const TreeProvider = ({
   indent = 20,
   className,
 }: TreeProviderProps) => {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+  const [internalExpandedIds, setInternalExpandedIds] = useState<Set<string>>(
     new Set(defaultExpandedIds)
   );
+  const expandedIds = controlledExpandedIds === undefined
+    ? internalExpandedIds
+    : new Set(controlledExpandedIds);
   const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>(
     selectedIds ?? []
   );
@@ -91,16 +98,24 @@ export const TreeProvider = ({
   const currentSelectedIds = isControlled ? selectedIds : internalSelectedIds;
 
   const toggleExpanded = useCallback((nodeId: string) => {
-    setExpandedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(nodeId)) {
-        newSet.delete(nodeId);
+    if (controlledExpandedIds !== undefined) {
+      const next = new Set(controlledExpandedIds);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
       } else {
-        newSet.add(nodeId);
+        next.add(nodeId);
       }
-      return newSet;
+      onExpandedChange?.([...next]);
+      return;
+    }
+
+    setInternalExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
     });
-  }, []);
+  }, [controlledExpandedIds, onExpandedChange]);
 
   const handleSelection = useCallback(
     (nodeId: string, ctrlKey = false) => {

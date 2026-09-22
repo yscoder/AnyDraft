@@ -429,40 +429,48 @@ export default function App() {
       }
     });
 
-  const handleCreateMarkdown = (dirPath: string) =>
-    void runMutation(async () => {
+  const handleCreateMarkdown = async (dirPath: string): Promise<string | undefined> => {
+    let createdPath: string | undefined;
+    await runMutation(async () => {
       const repo = repoRef.current;
       if (!repo) return;
       try {
         const path = await repo.createTextFile(dirPath, '未命名.md');
         await refreshRepo();
         setActiveFile(path);
+        createdPath = path;
         flash(`已新建「${baseNamePath(path)}」`, 'success');
       } catch {
         flash('新建失败', 'error');
       }
     });
+    return createdPath;
+  };
 
-  const handleCreateDirectory = (dirPath: string) =>
-    void runMutation(async () => {
+  const handleCreateDirectory = async (dirPath: string): Promise<string | undefined> => {
+    let createdPath: string | undefined;
+    await runMutation(async () => {
       const repo = repoRef.current;
       if (!repo) return;
       try {
-        await repo.createDirectory(dirPath, '新建文件夹');
+        createdPath = await repo.createDirectory(dirPath, '新建文件夹');
         await refreshRepo();
         flash('已新建文件夹', 'success');
       } catch {
         flash('新建文件夹失败', 'error');
       }
     });
+    return createdPath;
+  };
 
-  const handleRenameNode = (path: string, newName: string) => {
+  const handleRenameNode = async (path: string, newName: string): Promise<string | undefined> => {
     const repo = repoRef.current;
     const trimmed = newName.trim();
     if (!repo || !trimmed) return;
     const node = nodes.find((n) => n.path === path);
     if (!node || node.name === trimmed) return;
-    void runMutation(async () => {
+    let renamedPath: string | undefined;
+    await runMutation(async () => {
       try {
         const newPath = await repo.renameNode(path, trimmed);
         const remap = <T,>(obj: Record<string, T>): Record<string, T> => {
@@ -478,12 +486,14 @@ export default function App() {
           setActiveFile(activePath === path ? newPath : newPath + activePath.slice(path.length));
         }
         await scanRepo(repo);
+        renamedPath = newPath;
         flash(`已重命名为「${baseNamePath(newPath)}」`, 'success');
       } catch (err) {
         flash(err instanceof Error ? err.message : '重命名失败', 'error');
         await scanRepo(repo).catch(() => {});
       }
     });
+    return renamedPath;
   };
 
   const handleDeleteNode = (path: string) => {
@@ -779,6 +789,7 @@ export default function App() {
             onCreateDirectory={handleCreateDirectory}
             onRename={handleRenameNode}
             onDelete={handleDeleteNode}
+            onChangeRoot={() => void handlePickRoot()}
             onRefresh={handleRefresh}
             onLocateImage={handleLocateImage}
             onCleanupImages={handleCleanupImages}

@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Eraser,
+  BookText,
+  BrushCleaning,
   File,
   FilePlus,
   FileText,
+  Folder,
+  FolderCog,
   FolderPlus,
   Image as ImageIcon,
   MoreHorizontal,
@@ -23,7 +26,6 @@ import {
 } from './ui/dropdown-menu';
 import { TooltipHint } from '@/components/ui/tooltip';
 import {
-  TreeExpander,
   TreeIcon,
   TreeLabel,
   TreeNode,
@@ -43,13 +45,14 @@ interface Props {
   rootName: string;
   tree: TreeBranch[];
   activePath: string;
-  markdownCount: number;
+  markdownCount?: number;
   unusedImageCount: number;
   onSelect: (path: string) => void;
-  onCreateMarkdown: (dirPath: string) => void;
-  onCreateDirectory: (dirPath: string) => void;
-  onRename: (path: string, newName: string) => void;
+  onCreateMarkdown: (dirPath: string) => Promise<string | undefined>;
+  onCreateDirectory: (dirPath: string) => Promise<string | undefined>;
+  onRename: (path: string, newName: string) => Promise<string | undefined>;
   onDelete: (path: string) => void;
+  onChangeRoot: () => void;
   onRefresh: () => void;
   onLocateImage: (name: string) => void;
   onCleanupImages: () => void;
@@ -94,19 +97,20 @@ export default function FileTree({
   rootName,
   tree,
   activePath,
-  markdownCount,
   unusedImageCount,
   onSelect,
   onCreateMarkdown,
   onCreateDirectory,
   onRename,
   onDelete,
+  onChangeRoot,
   onRefresh,
   onLocateImage,
   onCleanupImages,
 }: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [expandedIds, setExpandedIds] = useState<string[]>(['']);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [now] = useState(() => Date.now());
 
@@ -115,20 +119,31 @@ export default function FileTree({
   }, [renamingPath]);
 
   const submitRename = () => {
-    if (renamingPath && renameValue.trim()) onRename(renamingPath, renameValue);
+    const path = renamingPath;
+    const newName = renameValue.trim();
     setRenamingPath(null);
     setRenameValue('');
+    if (!path || !newName) return;
+
+    void onRename(path, newName).then((newPath) => {
+      if (!newPath || newPath === path) return;
+      setExpandedIds((current) => current.map((id) =>
+        id === path || id.startsWith(`${path}/`)
+          ? newPath + id.slice(path.length)
+          : id,
+      ));
+    });
   };
 
   /** 重命名行：替换 TreeNodeTrigger，保留缩进对齐 */
-  const renameRow = (path: string, level: number) => (
-    <TreeNode key={path} nodeId={path} level={level}>
+  const renameRow = (node: RepoNode, level: number) => (
+    <TreeNode key={node.path} nodeId={node.path} level={level}>
       <div
         className="flex items-center gap-1.5 mx-1 my-0.5 rounded-md bg-card ring-2 ring-ring/35"
         style={{ paddingLeft: level * 20 + 11, paddingRight: 12, paddingTop: 5, paddingBottom: 5 }}
       >
         <span className="flex-none opacity-55">
-          <FileText size={14} />
+          {node.kind === 'dir' ? <Folder size={14} /> : nodeIcon(node.kind)}
         </span>
         <input
           ref={renameInputRef}
@@ -145,11 +160,29 @@ export default function FileTree({
     </TreeNode>
   );
 
+  const beginCreate = async (
+    dirPath: string,
+    create: (path: string) => Promise<string | undefined>,
+  ) => {
+    const createdPath = await create(dirPath);
+    if (!createdPath) return;
+
+    const parts = dirPath.split('/').filter(Boolean);
+    const parentPaths = [''];
+    for (let i = 0; i < parts.length; i += 1) {
+      parentPaths.push(parts.slice(0, i + 1).join('/'));
+    }
+    setExpandedIds((current) => [...new Set([...current, ...parentPaths])]);
+    setRenamingPath(createdPath);
+    setRenameValue(createdPath.slice(createdPath.lastIndexOf('/') + 1));
+  };
+
   /** 节点操作下拉菜单 */
   const renderNodeMenu = (node: RepoNode, isDir: boolean) => {
     const isMd = node.kind === 'markdown';
+    const isRoot = node.path === '';
     const showNewActions = isDir;
-    const showEditActions = (isDir && node.path !== '') || (!isDir && isMd);
+    const showEditActions = (isDir && !isRoot) || (!isDir && isMd);
     if (!showNewActions && !showEditActions) return null;
 
     return (
@@ -164,14 +197,29 @@ export default function FileTree({
               <MoreHorizontal size={12} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" sideOffset={4}>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={4}
+            onClick={(event) => event.stopPropagation()}
+          >
             {showNewActions && (
               <>
-                <DropdownMenuItem onSelect={() => onCreateMarkdown(node.path)}>
+                <DropdownMenuItem onSelect={() => void beginCreate(node.path, onCreateMarkdown)}>
                   <FilePlus size={14} /> 新建文档
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onCreateDirectory(node.path)}>
+                <DropdownMenuItem onSelect={() => void beginCreate(node.path, onCreateDirectory)}>
                   <FolderPlus size={14} /> 新建文件夹
+                </DropdownMenuItem>
+              </>
+            )}
+            {isRoot && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={unusedImageCount === 0}
+                  onSelect={onCleanupImages}
+                >
+                  <BrushCleaning size={14} /> 清理未引用图片
                 </DropdownMenuItem>
               </>
             )}
@@ -208,7 +256,7 @@ export default function FileTree({
     const isActive = node.path === activePath;
     const readonly = !isMd;
 
-    if (renamingPath === node.path) return renameRow(node.path, level);
+    if (renamingPath === node.path) return renameRow(node, level);
 
     const meta = isImage
       ? `${formatBytes(node.size ?? 0)}`
@@ -228,7 +276,6 @@ export default function FileTree({
             else if (isMd) onSelect(node.path);
           }}
         >
-          <TreeExpander hasChildren={isDir} />
           <TreeIcon
             icon={isDir ? undefined : nodeIcon(node.kind)}
             hasChildren={isDir}
@@ -262,7 +309,7 @@ export default function FileTree({
         {isDir && (
           <TreeNodeContent hasChildren>
             {children.length === 0 ? (
-              <p className="m-1 ml-1.5 text-[10.5px] leading-[1.5] text-muted-foreground/70">
+              <p className="m-1 ml-1.5 text-center text-[10.5px] leading-[1.5] text-muted-foreground/70">
                 空文件夹
               </p>
             ) : (
@@ -281,26 +328,42 @@ export default function FileTree({
     <nav className="flex flex-col flex-1 w-full min-h-0 overflow-hidden" aria-label="文件">
       <div className="flex-none flex items-center justify-between gap-1.5 min-h-10 py-[7px] pr-2 pl-3.5">
         <span className="text-xs font-semibold text-muted-foreground">文件</span>
-        <TooltipHint content="刷新目录">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-sm!"
-            aria-label="刷新目录"
-            onClick={onRefresh}
-          >
-            <RefreshCw />
-          </Button>
-        </TooltipHint>
+        <div className="flex items-center gap-0.5">
+          <TooltipHint content="更换目录">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-sm!"
+              aria-label="更换目录"
+              onClick={onChangeRoot}
+            >
+              <FolderCog />
+            </Button>
+          </TooltipHint>
+          <TooltipHint content="刷新目录">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-sm!"
+              aria-label="刷新目录"
+              onClick={onRefresh}
+            >
+              <RefreshCw />
+            </Button>
+          </TooltipHint>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-1.5" role="tree" aria-label="文件">
-        <TreeProvider defaultExpandedIds={['']} selectable={false}>
+        <TreeProvider
+          expandedIds={expandedIds}
+          onExpandedChange={setExpandedIds}
+          selectable={false}
+        >
           <TreeView className="p-0 overflow-hidden">
             <TreeNode nodeId="" level={0} isLast>
               <TreeNodeTrigger>
-                <TreeExpander hasChildren />
-                <TreeIcon hasChildren />
+                <TreeIcon icon={<BookText size={16} />} />
                 <TreeLabel className="text-xs font-semibold">{rootName}</TreeLabel>
                 {renderNodeMenu(rootNode, true)}
               </TreeNodeTrigger>
@@ -316,15 +379,6 @@ export default function FileTree({
             </TreeNode>
           </TreeView>
         </TreeProvider>
-        {unusedImageCount > 0 && (
-          <button
-            className="flex items-center gap-1.5 w-full mt-0.5 mx-1 px-1.5 py-1.5 border border-transparent bg-transparent rounded-lg text-[11px] text-muted-foreground cursor-pointer transition-colors hover:bg-accent hover:text-foreground"
-            onClick={onCleanupImages}
-          >
-            <Eraser size={13} />
-            清理 {unusedImageCount} 张未引用图片
-          </button>
-        )}
       </div>
     </nav>
   );

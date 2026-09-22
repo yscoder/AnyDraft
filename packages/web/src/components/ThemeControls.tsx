@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cn } from 'cn';
-import { AlignJustify, ChevronsUpDown, X } from 'lucide-react';
+import { AlignJustify, ChevronsUpDown, Palette, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -80,8 +80,9 @@ export default function ThemeControls({
         <TooltipHint content={`排版主题：${activeTheme.name}`}>
           <DrawerTrigger asChild>
             <Button variant="ghost" size="xs" className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium hover:text-foreground aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72]">
-              <span className="size-[9px] shrink-0 border border-[color-mix(in_oklch,var(--foreground)_16%,transparent)] rounded-full shadow-[inset_0_0_0_1px_rgb(255_255_255/0.35)]" style={{ background: activeTheme.accent }} aria-hidden="true" />
-              {activeTheme.name}
+              <Palette/>
+              <span className='leading-[1]'>{activeTheme.name}</span>
+              <span className="size-[8px] shrink-0 border border-[color-mix(in_oklch,var(--foreground)_16%,transparent)] rounded-full shadow-[inset_0_0_0_1px_rgb(255_255_255/0.35)]" style={{ background: activeTheme.accent }} aria-hidden="true" />
             </Button>
           </DrawerTrigger>
         </TooltipHint>
