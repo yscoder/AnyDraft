@@ -9,7 +9,6 @@ import MarkdownIt from 'markdown-it'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItMark from 'markdown-it-mark'
 import type { HLJSApi } from 'highlight.js'
-import { sanitizeRenderedHtml } from '@/core/markdown/sanitize'
 import {
   applyDensity,
   getTheme,
@@ -912,8 +911,9 @@ export function renderArticle(
   const th = density
     ? applyDensity(theme ?? getTheme(), density)
     : (theme ?? getTheme())
-  const body = sanitizeRenderedHtml(
-    colorTasks(md.render(preprocess(markdown), { theme: th, images }), th),
+  const body = colorTasks(
+    md.render(preprocess(markdown), { theme: th, images }),
+    th,
   )
   const html = `<section style="${st({
     'font-family': th.body.font,
