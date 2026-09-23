@@ -58,9 +58,9 @@ function greet(name: string): string {
 
 独占一行的图片：
 
-![独立图片](https://example.com/block.png)
+![独立图片](./icon-128.png)
 
-句子中间夹一张![行内图片](https://example.com/inline.png)的图片。
+句子中间夹一张![行内图片](./icon-128.png)的图片。
 
 脚注引用示例[^1]。
 
