@@ -1,7 +1,7 @@
 {
   "name": "any-draft",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "workspaces": [
     "packages/*"
@@ -19,6 +19,7 @@
     "check:rust": "cargo check --manifest-path packages/desktop/src-tauri/Cargo.toml",
     "test:rust": "cargo test --manifest-path packages/desktop/src-tauri/Cargo.toml",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "setv": "node scripts/set-version.js",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
