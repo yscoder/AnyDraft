@@ -3,18 +3,8 @@
    ============================================================ */
 
 /* ---------------- 工作区（可拖拽分割） ---------------- */
-
-.workspace {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  padding: 8px;
-}
-
 .workspace-panel {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -71,6 +61,6 @@
   box-shadow: 0 0 8px color-mix(in oklch, var(--foreground) 28%, transparent);
 }
 
-.workspace.mode-preview .workspace-resize-handle {
+.workspace-panel.mode-preview .workspace-resize-handle {
   display: none;
 }

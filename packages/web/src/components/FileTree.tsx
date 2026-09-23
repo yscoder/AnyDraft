@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   BookText,
-  BrushCleaning,
   File,
   FilePlus,
   FileText,
@@ -45,8 +44,6 @@ interface Props {
   rootName: string
   tree: TreeBranch[]
   activePath: string
-  markdownCount?: number
-  unusedImageCount: number
   onSelect: (path: string) => void
   onCreateMarkdown: (dirPath: string) => Promise<string | undefined>
   onCreateDirectory: (dirPath: string) => Promise<string | undefined>
@@ -55,7 +52,6 @@ interface Props {
   onChangeRoot: () => void
   onRefresh: () => void
   onLocateImage: (name: string) => void
-  onCleanupImages: () => void
 }
 
 /** 下拉菜单触发按钮：hover/聚焦/菜单打开时显形 */
@@ -97,7 +93,6 @@ export default function FileTree({
   rootName,
   tree,
   activePath,
-  unusedImageCount,
   onSelect,
   onCreateMarkdown,
   onCreateDirectory,
@@ -106,7 +101,6 @@ export default function FileTree({
   onChangeRoot,
   onRefresh,
   onLocateImage,
-  onCleanupImages,
 }: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -225,17 +219,6 @@ export default function FileTree({
                 </DropdownMenuItem>
               </>
             )}
-            {isRoot && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={unusedImageCount === 0}
-                  onSelect={onCleanupImages}
-                >
-                  <BrushCleaning size={14} /> 清理未引用图片
-                </DropdownMenuItem>
-              </>
-            )}
             {showNewActions && showEditActions && <DropdownMenuSeparator />}
             {showEditActions && (
               <>
@@ -347,11 +330,11 @@ export default function FileTree({
   return (
     <nav
       className="flex flex-col flex-1 w-full min-h-0 overflow-hidden"
-      aria-label="文件"
+      aria-label="文稿"
     >
       <div className="flex-none flex items-center justify-between gap-1.5 min-h-10 py-[7px] pr-2 pl-3.5">
         <span className="text-xs font-semibold text-muted-foreground">
-          文件
+          文稿
         </span>
         <div className="flex items-center gap-0.5">
           <TooltipHint content="更换目录">
@@ -382,7 +365,7 @@ export default function FileTree({
       <div
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pl-1.5"
         role="tree"
-        aria-label="文件"
+        aria-label="目录树"
       >
         <TreeProvider
           expandedIds={expandedIds}

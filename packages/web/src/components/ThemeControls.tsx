@@ -109,7 +109,7 @@ export default function ThemeControls({
             <Button
               variant="ghost"
               size="xs"
-              className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium hover:text-foreground aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72]"
+              className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72]"
             >
               <Palette />
               <span className="leading-[1]">{activeTheme.name}</span>
@@ -176,7 +176,7 @@ export default function ThemeControls({
             <Button
               variant="ghost"
               size="xs"
-              className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium hover:text-foreground aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72] density-trigger"
+              className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72] density-trigger"
             >
               <AlignJustify data-icon="inline-start" />
               {activeDensity.name}

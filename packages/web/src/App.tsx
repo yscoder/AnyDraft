@@ -32,11 +32,16 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { TooltipHint } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
-import { ListTree } from 'lucide-react'
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
+import { FileText, ListTree } from 'lucide-react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 import { toast } from 'sonner'
 import {
-  collectImageRefs,
   ensureHighlighter,
   isHighlighterReady,
   renderArticle,
@@ -52,14 +57,10 @@ import { renderLongImage } from '@/core/transfer/longimage'
 import { getDensity, getTheme } from '@/core/theme/theme'
 import { downscaleImage } from '@/core/image/images'
 import { createScrollSyncChannel } from '@/core/editor/scrollSync'
+import { findReferencedImages } from '@/core/drafts/assets'
 import { locateImage } from '@/core/drafts/locate'
 import { baseNamePath, dataUrlToBlob, dirnamePath } from '@/core/fs/fsa'
-import type {
-  AppRuntime,
-  ContentRepository,
-  Draft,
-  RepoNode,
-} from '@any-draft/shared'
+import type { AppRuntime, ContentRepository, RepoNode } from '@any-draft/shared'
 import { readStored, writeStored } from '@/core/storage'
 import { createRuntime } from '@/core/runtime/createRuntime'
 import './styles/index.css'
@@ -110,6 +111,7 @@ export default function App() {
 
   const activePathRef = useRef('')
   activePathRef.current = activePath
+  const documentLoadRef = useRef(0)
   const markdownRef = useRef('')
   const diskContentsRef = useRef<Record<string, string>>({})
   /** 异步目录操作进行中：期间跳过「选中项失效」的自动兜底，避免竞态 */
@@ -179,30 +181,18 @@ export default function App() {
     charCount >= 20000 ? 'over' : charCount >= 18000 ? 'warn' : 'normal'
   const countClass = `pane-stat count ${countLevel === 'warn' ? 'count-warn' : countLevel === 'over' ? 'count-over' : ''}`
 
-  /** 被任意文档引用的图片名（两种语法都算） */
-  const usedImageNames = useMemo(() => {
-    const used = new Set<string>()
-    for (const content of Object.values(contents)) {
-      for (const name of collectImageRefs(content)) used.add(name)
-    }
-    return used
-  }, [contents])
-
-  const unusedImageNodes = useMemo(
-    () => imageNodes.filter((n) => !usedImageNames.has(baseNamePath(n.path))),
-    [imageNodes, usedImageNames],
+  const referencedImages = useMemo(
+    () => (activePath ? findReferencedImages(activePath, markdown, nodes) : []),
+    [activePath, markdown, nodes],
   )
-
-  /** 供定位 / 备份复用的「文档列表」形状 */
-  const draftsForLocate = useMemo<Draft[]>(
-    () =>
-      mdNodes.map((n) => ({
-        id: n.path,
-        name: baseNamePath(n.path),
-        content: contents[n.path] ?? '',
-        updatedAt: n.updatedAt ?? 0,
-      })),
-    [mdNodes, contents],
+  const referencedImageSignature = referencedImages
+    .map(
+      ({ node }) => `${node.path}:${node.updatedAt ?? ''}:${node.size ?? ''}`,
+    )
+    .join('\n')
+  const availableImageNames = useMemo(
+    () => [...new Set(imageNodes.map((node) => baseNamePath(node.path)))],
+    [imageNodes],
   )
 
   const tree = useMemo<TreeBranch[]>(() => {
@@ -262,6 +252,44 @@ export default function App() {
     else panel.expand()
   }, [isPreviewOnly, isNarrow])
 
+  /** 当前文档引用变化时，只读取它实际使用的图片。 */
+  useEffect(() => {
+    let cancelled = false
+    const repo = repoRef.current
+
+    setImageUrls((previous) => {
+      for (const url of Object.values(previous)) URL.revokeObjectURL(url)
+      return {}
+    })
+    if (repoStatus !== 'ready' || !repo || !activePath) return
+
+    void Promise.all(
+      referencedImages.map(async ({ name, node }) => {
+        try {
+          return { name, url: await repo.imageUrl(node.path) }
+        } catch (error) {
+          console.warn(`图片加载失败：${node.path}`, error)
+          return null
+        }
+      }),
+    ).then((loaded) => {
+      const succeeded = loaded.filter((item) => item !== null)
+      if (cancelled) {
+        for (const { url } of succeeded) URL.revokeObjectURL(url)
+        return
+      }
+      setImageUrls(
+        Object.fromEntries(succeeded.map(({ name, url }) => [name, url])),
+      )
+    })
+
+    return () => {
+      cancelled = true
+    }
+    // referencedImageSignature 已包含图片路径和文件元数据，避免正文普通输入重复读取图片。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePath, referencedImageSignature, repoStatus])
+
   /* ---------------- 工作目录初始化 ---------------- */
   useEffect(() => {
     let cancelled = false
@@ -294,53 +322,70 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** 重新扫描目录（不动选中项），返回 md 文件路径列表 */
-  const scanRepo = async (repo: ContentRepository): Promise<string[]> => {
+  /** 只扫描目录节点和文件元数据，不读取任何文件内容。 */
+  const scanRepo = async (repo: ContentRepository): Promise<RepoNode[]> => {
     const all = await repo.list()
-    const mds = all.filter((n) => n.kind === 'markdown')
-    const imgs = all.filter((n) => n.kind === 'image')
-    const nextContents: Record<string, string> = {}
-    await Promise.all(
-      mds.map(async (n) => {
-        nextContents[n.path] = await repo.readTextFile(n.path)
-      }),
-    )
-    const nextUrls: Record<string, string> = {}
-    for (const n of imgs)
-      nextUrls[baseNamePath(n.path)] = await repo.imageUrl(n.path)
-
-    diskContentsRef.current = { ...nextContents }
     setNodes(all)
-    setContents(nextContents)
-    setImageUrls((prev) => {
-      for (const [k, url] of Object.entries(prev))
-        if (nextUrls[k] !== url) URL.revokeObjectURL(url)
-      return nextUrls
-    })
-    return mds.map((n) => n.path)
+    return all
   }
 
-  const refreshRepo = async (): Promise<void> => {
+  const clearActiveFile = () => {
+    documentLoadRef.current += 1
+    activePathRef.current = ''
+    setActivePath('')
+    setSaved(true)
+    setSaveFailed(false)
+  }
+
+  const refreshRepo = async (): Promise<RepoNode[]> => {
     const repo = repoRef.current
-    if (!repo) return
-    const mdPaths = await scanRepo(repo)
+    if (!repo) return []
+    const all = await scanRepo(repo)
     const cur = activePathRef.current
-    if (cur && !mdPaths.includes(cur)) setActiveFile(mdPaths[0] ?? '')
+    if (
+      cur &&
+      !all.some((node) => node.kind === 'markdown' && node.path === cur)
+    )
+      clearActiveFile()
+    return all
   }
 
-  const setActiveFile = (path: string) => {
-    setActivePath(path)
-    writeStored('active-file', path)
+  const openMarkdown = async (
+    path: string,
+    options: { force?: boolean; repo?: ContentRepository } = {},
+  ): Promise<void> => {
+    const repo = options.repo ?? repoRef.current
+    if (!repo || (!options.force && path === activePathRef.current)) return
+    const request = ++documentLoadRef.current
+    try {
+      const content = await repo.readTextFile(path)
+      if (request !== documentLoadRef.current || repo !== repoRef.current)
+        return
+      diskContentsRef.current[path] = content
+      setContents((previous) => ({ ...previous, [path]: content }))
+      activePathRef.current = path
+      setActivePath(path)
+      setSaved(true)
+      setSaveFailed(false)
+    } catch (error) {
+      console.warn('Markdown 加载失败', error)
+      flash('Markdown 加载失败', 'error')
+    }
   }
 
   const openRepo = async (repo: ContentRepository): Promise<void> => {
+    documentLoadRef.current += 1
     repoRef.current = repo
     setRootName(repo.rootName || '浏览器内置存储')
-    const mdPaths = await scanRepo(repo)
-    const savedPath = readStored('active-file')
-    const restored =
-      savedPath && mdPaths.includes(savedPath) ? savedPath : (mdPaths[0] ?? '')
-    setActiveFile(restored)
+    activePathRef.current = ''
+    setActivePath('')
+    setContents({})
+    diskContentsRef.current = {}
+    setImageUrls((previous) => {
+      for (const url of Object.values(previous)) URL.revokeObjectURL(url)
+      return {}
+    })
+    await scanRepo(repo)
     setRepoStatus('ready')
   }
 
@@ -353,12 +398,13 @@ export default function App() {
     }
   }
 
-  /** 选中项在目录里消失了（外部删除 / 自身删除）时回落到第一篇 */
+  /** 选中项在目录里消失后回到未打开状态，不自动读取其它文档。 */
   useEffect(() => {
     if (repoStatus !== 'ready' || mutatingRef.current) return
     if (!activePath) return
     if (mdNodes.some((n) => n.path === activePath)) return
-    setActiveFile(mdNodes[0]?.path ?? '')
+    clearActiveFile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mdNodes, activePath, repoStatus])
 
   /* ---------------- 自动保存（防抖写盘） ---------------- */
@@ -492,7 +538,17 @@ export default function App() {
   const handleRefresh = () =>
     void runMutation(async () => {
       try {
-        await refreshRepo()
+        const repo = repoRef.current
+        if (!repo) return
+        const path = activePathRef.current
+        const content = markdownRef.current
+        if (path && diskContentsRef.current[path] !== content) {
+          await repo.writeTextFile(path, content)
+          diskContentsRef.current[path] = content
+        }
+        const all = await refreshRepo()
+        if (path && all.some((node) => node.path === path))
+          await openMarkdown(path, { force: true, repo })
         flash('已刷新目录', 'success')
       } catch {
         flash('刷新失败，请检查目录权限', 'error')
@@ -509,7 +565,7 @@ export default function App() {
       try {
         const path = await repo.createTextFile(dirPath, '未命名.md')
         await refreshRepo()
-        setActiveFile(path)
+        await openMarkdown(path)
         createdPath = path
         flash(`已新建「${baseNamePath(path)}」`, 'success')
       } catch {
@@ -564,11 +620,12 @@ export default function App() {
         setContents((prev) => remap(prev))
         diskContentsRef.current = remap(diskContentsRef.current)
         if (activePath === path || activePath.startsWith(`${path}/`)) {
-          setActiveFile(
+          const nextActivePath =
             activePath === path
               ? newPath
-              : newPath + activePath.slice(path.length),
-          )
+              : newPath + activePath.slice(path.length)
+          activePathRef.current = nextActivePath
+          setActivePath(nextActivePath)
         }
         await scanRepo(repo)
         renamedPath = newPath
@@ -651,39 +708,17 @@ export default function App() {
   const jumpNonce = useRef(0)
 
   const handleLocateImage = (name: string) => {
-    const hit = locateImage(draftsForLocate, activePath, name)
-    if (!hit) {
-      flash(`「${name}」还没有被任何文档引用`, 'warning')
+    if (!activePath) {
+      flash('请先打开一篇 Markdown 文档', 'warning')
       return
     }
-    if (hit.draft.id !== activePath) {
-      setActiveFile(hit.draft.id)
-      flash(`已跳到「${hit.draft.name}」`, 'info')
+    const line = locateImage(markdown, name)
+    if (line == null) {
+      flash(`当前文档没有引用「${name}」`, 'warning')
+      return
     }
     jumpNonce.current += 1
-    setJumpRequest({ line: hit.line, nonce: jumpNonce.current })
-  }
-
-  const handleCleanupImages = () => {
-    const repo = repoRef.current
-    if (!repo || unusedImageNodes.length === 0) return
-    setConfirmation({
-      title: '清理未引用图片？',
-      description: `将永久删除 ${unusedImageNodes.length} 张未被任何文档引用的图片，此操作无法撤销。`,
-      actionLabel: `删除 ${unusedImageNodes.length} 张图片`,
-      onConfirm: () =>
-        runMutation(async () => {
-          try {
-            await Promise.all(
-              unusedImageNodes.map((n) => repo.removeNode(n.path)),
-            )
-            await refreshRepo()
-            flash(`已清理 ${unusedImageNodes.length} 张未引用图片`, 'success')
-          } catch {
-            flash('部分图片删除失败', 'warning')
-          }
-        }),
-    })
+    setJumpRequest({ line, nonce: jumpNonce.current })
   }
 
   /* ---------------- 复制 / 导出 ---------------- */
@@ -691,20 +726,14 @@ export default function App() {
   const resolveImageDataUrls = async (
     md: string,
   ): Promise<Record<string, string>> => {
-    const refs = collectImageRefs(md)
+    const repo = repoRef.current
+    if (!repo || !activePath) return {}
+    const images = findReferencedImages(activePath, md, nodes)
     const out: Record<string, string> = {}
     await Promise.all(
-      [...refs].map(async (name) => {
-        const url = imageUrls[name]
-        if (!url) return
+      images.map(async ({ name, node }) => {
         try {
-          const blob = await (await fetch(url)).blob()
-          const reader = new FileReader()
-          out[name] = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = () => reject(reader.error)
-            reader.readAsDataURL(blob)
-          })
+          out[name] = await repo.readImageAsDataUrl(node.path)
         } catch {
           /* 单张转换失败则跳过，正文退回占位提示 */
         }
@@ -741,26 +770,25 @@ export default function App() {
   }
 
   const handleExportBackup = async () => {
+    if (!activeDraft) return
     setExporting(true)
     try {
       const repo = repoRef.current
       const imagesData: Record<string, string> = {}
       if (repo) {
         await Promise.all(
-          imageNodes.map(async (n) => {
-            imagesData[baseNamePath(n.path)] = await repo.readImageAsDataUrl(
-              n.path,
-            )
+          referencedImages.map(async ({ name, node }) => {
+            imagesData[name] = await repo.readImageAsDataUrl(node.path)
           }),
         )
       }
       const runtime = runtimeRef.current
       if (!runtime) return
-      const blob = await createBackupZipBlob(draftsForLocate, imagesData)
+      const blob = await createBackupZipBlob([activeDraft], imagesData)
       const saved = await runtime.exportFile(`稿域备份-${stamp()}.zip`, blob)
       if (saved)
         flash(
-          `已导出备份（${draftsForLocate.length} 篇草稿 · ${imageNodes.length} 张图片）`,
+          `已导出备份（当前草稿 · ${referencedImages.length} 张图片）`,
           'success',
         )
     } catch (err) {
@@ -827,7 +855,7 @@ export default function App() {
           await repo.createImageFile(folder, name, dataUrlToBlob(dataUrl))
         }
         await refreshRepo()
-        if (firstPath) setActiveFile(firstPath)
+        if (firstPath) await openMarkdown(firstPath)
         const parts = [
           incoming.length ? `${incoming.length} 篇草稿` : '',
           imageCount ? `${imageCount} 张图片` : '',
@@ -963,9 +991,7 @@ export default function App() {
             rootName={rootName}
             tree={tree}
             activePath={activePath}
-            markdownCount={mdNodes.length}
-            unusedImageCount={unusedImageNodes.length}
-            onSelect={setActiveFile}
+            onSelect={(path) => void openMarkdown(path)}
             onCreateMarkdown={handleCreateMarkdown}
             onCreateDirectory={handleCreateDirectory}
             onRename={handleRenameNode}
@@ -973,46 +999,48 @@ export default function App() {
             onChangeRoot={() => void handlePickRoot()}
             onRefresh={handleRefresh}
             onLocateImage={handleLocateImage}
-            onCleanupImages={handleCleanupImages}
           />
         </SidebarContent>
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="h-full min-w-0">
-        <div className={`workspace ${isPreviewOnly ? 'mode-preview' : ''}`}>
-          <section className="workspace-panel">
-            <div className="workspace-panel-head">
-              <div className="workspace-panel-head-left">
-                <SidebarTrigger className="rounded-md" />
-              </div>
-              <ToggleGroup
-                type="single"
-                value={viewMode}
-                variant="outline"
-                size="sm"
-                spacing={0}
-                aria-label="工作区模式"
-                onValueChange={(value) =>
-                  value && setViewMode(value as 'split' | 'preview')
-                }
-              >
-                <ToggleGroupItem value="split" aria-label="对照模式">
-                  对照
-                </ToggleGroupItem>
-                <ToggleGroupItem value="preview" aria-label="预览模式">
-                  预览
-                </ToggleGroupItem>
-              </ToggleGroup>
-              <Toolbar
-                onCopy={() => void handleCopy()}
-                onImport={handleImport}
-                onExportMarkdown={() => void handleExportMarkdown()}
-                onExportBackup={() => void handleExportBackup()}
-                onExportImage={() => void handleExportImage()}
-                exporting={exporting}
-              />
+      <SidebarInset className="h-full min-w-0 p-2">
+        <section
+          className={`workspace-panel ${isPreviewOnly ? 'mode-preview' : ''}`}
+        >
+          <div className="workspace-panel-head">
+            <div className="workspace-panel-head-left">
+              <SidebarTrigger className="rounded-md" />
             </div>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              variant="outline"
+              size="sm"
+              spacing={0}
+              aria-label="工作区模式"
+              onValueChange={(value) =>
+                value && setViewMode(value as 'split' | 'preview')
+              }
+            >
+              <ToggleGroupItem value="split" aria-label="对照模式">
+                对照
+              </ToggleGroupItem>
+              <ToggleGroupItem value="preview" aria-label="预览模式">
+                预览
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Toolbar
+              onCopy={() => void handleCopy()}
+              onImport={handleImport}
+              onExportMarkdown={() => void handleExportMarkdown()}
+              onExportBackup={() => void handleExportBackup()}
+              onExportImage={() => void handleExportImage()}
+              exporting={exporting}
+              hasActiveDraft={Boolean(activeDraft)}
+            />
+          </div>
+          {activeDraft ? (
             <ResizablePanelGroup
               key={isNarrow ? 'vertical' : 'horizontal'}
               className="flex-1 min-w-0 min-h-0 overflow-hidden"
@@ -1031,7 +1059,7 @@ export default function App() {
                   value={markdown}
                   onChange={setMarkdown}
                   onAddImage={handleAddImage}
-                  imageNames={Object.keys(imageUrls)}
+                  imageNames={availableImageNames}
                   fileKey={activePath}
                   sync={scrollSync}
                   jumpRequest={jumpRequest}
@@ -1063,10 +1091,29 @@ export default function App() {
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
+          ) : (
+            <Empty className="min-h-0 rounded-none bg-background">
+              <EmptyHeader>
+                <EmptyMedia
+                  variant="icon"
+                  className="size-12 text-secondary-foreground"
+                >
+                  <FileText className="size-8" />
+                </EmptyMedia>
+                <EmptyTitle className="text-md text-secondary-foreground">
+                  请从左侧选择 Markdown 文件
+                </EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {activeDraft && (
             <div className="workspace-statusbar">
               <div className="workspace-statusbar-left">
-                <button
-                  className={`outline-toggle ${outlineOpen ? 'active' : ''}`}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="h-[26px] px-2 rounded-md text-muted-foreground text-[11px] font-medium aria-expanded:text-foreground [&_svg]:size-[13px] [&_svg]:opacity-[0.72]"
                   aria-label="目录"
                   aria-expanded={outlineOpen}
                   onClick={() => {
@@ -1074,9 +1121,9 @@ export default function App() {
                     setOutlineOpen((value) => !value)
                   }}
                 >
-                  <ListTree size={14} />
+                  <ListTree />
                   <span>目录</span>
-                </button>
+                </Button>
                 <TooltipHint
                   content={
                     countLevel === 'over'
@@ -1101,8 +1148,8 @@ export default function App() {
                 onDensityChange={setDensityId}
               />
             </div>
-          </section>
-        </div>
+          )}
+        </section>
       </SidebarInset>
       <AlertDialog
         open={Boolean(confirmation)}

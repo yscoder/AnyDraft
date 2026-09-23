@@ -2,7 +2,7 @@
 
 > 本地优先的公众号 Markdown 创作工作台。
 
-[在线体验](https://anydraft.pages.dev/) · [GitHub 仓库](https://github.com/yscoder/AnyDraft) · [问题反馈](https://github.com/yscoder/AnyDraft/issues)
+[在线体验](https://anydraft.pages.dev/) · [问题反馈](https://github.com/yscoder/AnyDraft/issues) · [TODOLIST](./TODOLIST.md)
 
 稿域面向公众号内容创作者，提供 Markdown 编辑、实时排版预览和富文本复制能力。草稿与图片默认保存在你选择的本地目录中，也可以使用浏览器内置存储；内容不会上传到云端服务器，无需图床。
 
@@ -13,9 +13,9 @@
 - 提供多套排版主题与内容密度设置
 - 一键复制带内联样式的富文本，直接粘贴到公众号编辑器
 - 直接读写本地 Markdown、图片和文件夹，支持自动保存
-- 支持拖入或粘贴图片，并可定位引用、清理未引用图片
+- 支持拖入或粘贴图片，并可在当前文档中定位图片引用
 - 导入 `.md`、`.markdown`、`.txt` 或 `.zip` 备份
-- 导出当前草稿、正文长图或包含草稿与图片的完整备份
+- 导出当前草稿、正文长图或包含当前草稿及引用图片的备份
 - 根据屏幕宽度切换横向或纵向编辑布局
 
 ## 快速开始
@@ -27,7 +27,7 @@
 首次打开时，你可以选择：
 
 - **打开本地目录**：草稿保存为真实的 Markdown 文件，图片保存为普通图片文件，可被其他工具直接访问。
-- **使用浏览器内置存储**：无需授权本地目录，但数据只保存在当前站点对应的浏览器配置中。清理站点数据或删除浏览器配置可能导致内容丢失，请定期导出完整备份。
+- **使用浏览器内置存储**：无需授权本地目录，但数据只保存在当前站点对应的浏览器配置中。清理站点数据或删除浏览器配置可能导致内容丢失，请定期导出备份。
 
 浏览器可能会在新的会话中要求你重新确认目录读写权限。
 
@@ -76,9 +76,9 @@ npm run tauri:dev
 | 复制到公众号 | 富文本剪贴板内容 | 粘贴到公众号编辑器 |
 | 导出当前草稿 | `.md` | 保存或分享单篇文章 |
 | 导出正文长图 | `.png` | 预览或分享排版结果 |
-| 导出全部备份 | `.zip` | 迁移草稿和图片 |
+| 备份 | `.zip` | 迁移当前草稿和其中引用的图片 |
 
-完整备份可以再次导入稿域。导入的内容会放在新的时间戳文件夹中，避免与已有文件混杂。
+备份可以再次导入稿域。导入的内容会放在新的时间戳文件夹中，避免与已有文件混杂。
 
 ## 浏览器支持
 
@@ -115,11 +115,11 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
                               原生文件系统
 ```
 
-构建时由 `import.meta.env.VITE_APP_RUNTIME` 固定选择 `web` 或 `tauri` 适配器；
-运行中不会静默切换存储后端。
+构建时由 `import.meta.env.VITE_APP_RUNTIME` 固定选择 `web` 或 `tauri` 适配器。
 
 ## 技术栈
 
+- npm workspaces
 - React 19
 - TypeScript 7
 - Vite 7
@@ -129,7 +129,6 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
 - markdown-it
 - highlight.js
 - Tauri 2 与 Rust
-- npm workspaces
 
 ## 开发命令
 
@@ -147,6 +146,7 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
 | `npm test` | 运行自动化测试 |
 | `npm run format` | 使用 Prettier 格式化仓库文件 |
 | `npm run format:check` | 检查仓库文件是否符合 Prettier 配置 |
+| `npm run setv -- <version>` | 统一更新仓库各处版本号（加 `--dry-run` 只预览） |
 | `npm run deploy` | 构建并发布到 Cloudflare Pages |
 
 ## 测试与质量检查
@@ -160,34 +160,32 @@ npm test
 npm run build
 ```
 
-现有测试包含预览与导出样式隔离检查，用于保证同一份正文在稿域预览中和复制到外部环境后保持一致。
-
 ## 部署
 
-Web 版部署到 Cloudflare Pages。完成 Wrangler 登录并获得对应项目权限后运行：
+Web 版部署到 Cloudflare Pages。
 
 ```bash
 npm run deploy
 ```
 
-该命令会先执行生产构建，再将 `packages/web/dist` 发布到 Cloudflare Pages 的 `any-draft` 项目。
-
 ## 桌面端
 
 桌面客户端生产目标为 Windows x64 与 macOS arm64，最低建议系统分别为 Windows 10
-和 macOS 11。发布 GitHub Release 时，GitHub Actions 会从该 Release 对应的 tag
-分别构建 macOS `.dmg` 和 Windows NSIS `.exe`，并将安装包上传为 Release Assets。
+和 macOS 11。
 
-发布前需同步更新 `packages/desktop/package.json`、
-`packages/desktop/src-tauri/tauri.conf.json` 和
-`packages/desktop/src-tauri/Cargo.toml` 中的版本号，然后创建并发布对应的版本 tag，
-例如 `v0.1.0`。
+发布前用一条命令同步版本号，再创建并发布对应的版本 tag（例如 `v0.1.0`）：
+
+```bash
+npm run setv -- 0.1.0
+```
+
+该命令会同时更新根 `package.json`、`packages/web/package.json`、
+`packages/desktop/package.json`、`packages/desktop/src-tauri/tauri.conf.json`、
+`packages/desktop/src-tauri/Cargo.toml` 与对应的 `Cargo.lock`；
+加上 `--dry-run` 可以只预览改动而不写入文件。
 
 当前仓库没有提交签名证书，也没有启用自动更新：macOS 构建使用 ad-hoc 签名，
 Windows 构建为未签名安装程序。
-
-正式外部分发前需要配置 macOS Developer ID 签名与公证，以及 Windows 代码签名；
-未签名产物可能被系统安全机制拦截或显示警告。
 
 ## 许可
 

@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import {
   Archive,
   ChevronDown,
-  Clipboard,
+  Copy,
   Download,
   FileText,
   ImageIcon,
@@ -23,12 +23,14 @@ interface Props {
   onImport: (files: File[]) => void
   /** 导出当前草稿为 .md */
   onExportMarkdown: () => void
-  /** 导出全部草稿 + 图片为 zip 备份 */
+  /** 导出当前草稿 + 引用图片为 zip 备份 */
   onExportBackup: () => void
   /** 导出正文长图 PNG */
   onExportImage: () => void
   /** 导出进行中：禁用菜单，避免重复触发 */
   exporting: boolean
+  /** 是否已打开 Markdown；未打开时禁用内容相关操作 */
+  hasActiveDraft: boolean
 }
 
 export default function Toolbar({
@@ -38,6 +40,7 @@ export default function Toolbar({
   onExportBackup,
   onExportImage,
   exporting,
+  hasActiveDraft,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -63,7 +66,7 @@ export default function Toolbar({
           aria-label="导入 Markdown 文件或备份包"
           onClick={() => fileRef.current?.click()}
         >
-          <Upload data-icon="inline-start" />
+          <Upload />
           <span className="max-[700px]:hidden">导入</span>
         </Button>
       </TooltipHint>
@@ -73,10 +76,10 @@ export default function Toolbar({
           <Button
             variant="outline"
             size="sm"
-            disabled={exporting}
+            disabled={exporting || !hasActiveDraft}
             aria-label={exporting ? '导出中' : '导出'}
           >
-            <Download data-icon="inline-start" />
+            <Download />
             <span className="max-[700px]:hidden">
               {exporting ? '导出中…' : '导出'}
             </span>
@@ -98,16 +101,21 @@ export default function Toolbar({
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onExportBackup}>
             <Archive />
-            全部备份 .zip
+            备份 .zip
             <span className="ml-auto text-xs text-muted-foreground">
-              草稿 + 图片
+              草稿 + 引用图片
             </span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button size="sm" onClick={onCopy} aria-label="复制到公众号">
-        <Clipboard data-icon="inline-start" />
+      <Button
+        size="sm"
+        onClick={onCopy}
+        aria-label="复制到公众号"
+        disabled={!hasActiveDraft}
+      >
+        <Copy />
         <span className="max-[700px]:hidden">复制到公众号</span>
       </Button>
     </div>

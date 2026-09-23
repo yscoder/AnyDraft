@@ -695,7 +695,10 @@ export function collectImageRefs(markdown: string): Set<string> {
     }
     const raw = paren.inner.trim().replace(/^<|>$/g, '')
     const { dest } = splitDestTitle(raw)
-    if (dest && !isAbsoluteUrl(dest)) names.add(localImageKey(dest))
+    if (dest && !isAbsoluteUrl(dest)) {
+      names.add(dest)
+      names.add(localImageKey(dest))
+    }
     i = paren.end + 1
   }
   return names
