@@ -120,6 +120,7 @@ export default function App() {
   const [themeId, setThemeId] = useState<string>(
     () => readStored('theme') ?? 'classic',
   )
+  const [darkPreview, setDarkPreview] = useState(false)
   const [densityId, setDensityId] = useState<string>(
     () => readStored('density') ?? 'standard',
   )
@@ -1004,7 +1005,7 @@ export default function App() {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="h-full min-w-0 p-2">
+      <SidebarInset className="h-full min-w-0 p-2 overflow-hidden">
         <section
           className={`workspace-panel ${isPreviewOnly ? 'mode-preview' : ''}`}
         >
@@ -1084,6 +1085,7 @@ export default function App() {
                 }
               >
                 <PreviewPane
+                  darkPreview={darkPreview}
                   body={result.body}
                   theme={theme}
                   resizeKey={`${viewMode}:${isNarrow ? 'vertical' : 'horizontal'}`}
@@ -1092,7 +1094,7 @@ export default function App() {
               </ResizablePanel>
             </ResizablePanelGroup>
           ) : (
-            <Empty className="min-h-0 rounded-none bg-background">
+            <Empty className="min-h-0">
               <EmptyHeader>
                 <EmptyMedia
                   variant="icon"
@@ -1142,6 +1144,8 @@ export default function App() {
                 </span>
               </div>
               <ThemeControls
+                darkPreview={darkPreview}
+                onDarkPreviewChange={setDarkPreview}
                 themeId={themeId}
                 onThemeChange={setThemeId}
                 densityId={densityId}

@@ -291,8 +291,7 @@
   );
 }
 
-/* Night Sky under a dark paper (the web build has no shell dark mode, so the
-   article theme's appearance decides): deep navy glass, a darker polished rim */
+/* Night Sky in dark preview: deep navy glass, a darker polished rim */
 .preview-side[data-appearance='dark'][data-device='pad'] {
   --duo-rim: linear-gradient(
     148deg,

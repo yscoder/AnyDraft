@@ -10,8 +10,6 @@ export interface Theme {
   id: string
   name: string
   description: string
-  /** 预览纸底是浅色还是深色（主题栏据此分组；不要靠 codePaletteMode 推断） */
-  appearance: 'light' | 'dark'
   /** 等宽字体（代码） */
   mono: string
   /** 正文基础（section 包裹 / 段落继承） */
@@ -181,41 +179,6 @@ const PALETTE_LIGHT: Record<string, string> = {
   'hljs-strong': '#4a443c',
 }
 
-/** 深色板：黑底终端上的高对比荧光色（暗夜终端） */
-const PALETTE_DARK: Record<string, string> = {
-  'hljs-keyword': '#ff7ab2',
-  'hljs-string': '#ffd27a',
-  'hljs-title': '#7ad0ff',
-  'hljs-title.function_': '#7ad0ff',
-  'hljs-title.class_': '#7ad0ff',
-  'hljs-number': '#ff9e64',
-  'hljs-literal': '#ff9e64',
-  'hljs-built_in': '#9eceff',
-  'hljs-type': '#9eceff',
-  'hljs-attr': '#c0e39a',
-  'hljs-attribute': '#c0e39a',
-  'hljs-comment': '#6a7a68',
-  'hljs-meta': '#7a8a76',
-  'hljs-variable': '#7adfae',
-  'hljs-params': '#d8ceb8',
-  'hljs-symbol': '#ff9e64',
-  'hljs-regexp': '#ffd27a',
-  'hljs-addition': '#7adfae',
-  'hljs-deletion': '#ff7a7a',
-  'hljs-selector-tag': '#ff7ab2',
-  'hljs-selector-class': '#7ad0ff',
-  'hljs-selector-id': '#7ad0ff',
-  'hljs-selector-attr': '#c0e39a',
-  'hljs-selector-pseudo': '#c0e39a',
-  'hljs-tag': '#ffd27a',
-  'hljs-name': '#ff7ab2',
-  'hljs-operator': '#8a9a88',
-  'hljs-bullet': '#ff9e64',
-  'hljs-quote': '#6a7a68',
-  'hljs-emphasis': '#8a9a88',
-  'hljs-strong': '#e6ffe9',
-}
-
 /* ---------------- 主题预设 ---------------- */
 
 /** 经典：衬线标题 + 陶土橙强调，克制干净 */
@@ -223,7 +186,6 @@ export const classicTheme: Theme = {
   id: 'classic',
   name: '经典',
   description: '衬线标题 + 陶土橙强调，克制干净',
-  appearance: 'light',
   mono: MONO,
   body: {
     font: SANS,
@@ -318,7 +280,6 @@ export const editorialTheme: Theme = {
   id: 'editorial',
   name: '杂志编辑',
   description: '绯红强调 + 重磅衬线标题 + 报刊引语',
-  appearance: 'light',
   mono: MONO,
   body: { font: SANS, fontSize: '16px', lineHeight: '1.9', color: '#22211e' },
   accent: '#c43a2d',
@@ -415,7 +376,6 @@ export const creamTheme: Theme = {
   id: 'cream',
   name: '奶油手账',
   description: '蜂蜜琥珀 + 奶油纸底 + 贴纸式卡片',
-  appearance: 'light',
   mono: MONO,
   body: {
     font: SANS,
@@ -510,119 +470,11 @@ export const creamTheme: Theme = {
   codePaletteMode: 'light',
 }
 
-/** 暗夜终端：终端绿 + 等宽标题 + 黑底发光代码片，黑客终端气质 */
-export const darkTheme: Theme = {
-  id: 'dark',
-  name: '暗夜终端',
-  description: '终端绿 + 等宽标题 + 发光代码片',
-  appearance: 'dark',
-  mono: MONO,
-  body: {
-    font: SANS,
-    fontSize: '16px',
-    lineHeight: '1.85',
-    color: '#c9d4c3',
-    bg: '#0d1117',
-  },
-  accent: '#4ade80',
-  accentSoft: 'rgba(74,222,128,.12)',
-  heading: {
-    font: MONO,
-    fontWeight: '700',
-    color: '#e6ffe9',
-    lineHeight: '1.4',
-    letterSpacing: '0.5px',
-    marginTop: '34px',
-    marginBottom: '12px',
-    decor: 'accent-bar',
-  },
-  headingSizes: {
-    h1: '27px',
-    h2: '22px',
-    h3: '19px',
-    h4: '17px',
-    h5: '16px',
-    h6: '15px',
-  },
-  pMargin: '16px',
-  quote: {
-    background: '#11161d',
-    color: '#a8b8a3',
-    borderLeft: '3px solid #4ade80',
-    borderRadius: '0 10px 10px 0',
-    padding: '13px 17px',
-    margin: '22px 0',
-    extra: { 'box-shadow': 'inset 0 0 0 1px rgba(74,222,128,.08)' },
-  },
-  callout: {
-    background: 'rgba(74,222,128,.08)',
-    color: '#a8b8a3',
-    borderLeft: '3px solid #4ade80',
-    borderRadius: '0 10px 10px 0',
-    padding: '14px 16px',
-    margin: '22px 0',
-    extra: { 'box-shadow': 'inset 0 0 0 1px rgba(74,222,128,.10)' },
-  },
-  code: {
-    background: '#0a0e13',
-    color: '#4ade80',
-    borderRadius: '4px',
-    padding: '2px 6px',
-    fontSize: '0.88em',
-    extra: {
-      border: '1px solid rgba(74,222,128,.22)',
-      'text-shadow': '0 0 8px rgba(74,222,128,.35)',
-    },
-  },
-  codeBlock: {
-    background: '#080b0f',
-    color: '#9fdcae',
-    borderRadius: '10px',
-    padding: '16px 18px',
-    fontSize: '14px',
-    lineHeight: '1.7',
-    extra: {
-      border: '1px solid rgba(74,222,128,.18)',
-      'box-shadow': '0 0 24px rgba(74,222,128,.06) inset',
-    },
-  },
-  link: { color: '#4ade80', textDecoration: 'underline' },
-  listPaddingLeft: '26px',
-  listItemMargin: '6px 0',
-  table: {
-    borderColor: '#1e2a24',
-    headBg: '#111c16',
-    headColor: '#b8f2c6',
-    fontSize: '15px',
-    cellPadding: '8px 12px',
-  },
-  hr: { color: '#1e2a24', margin: '30px 0' },
-  img: { borderRadius: '10px', margin: '16px auto' },
-  strongColor: '#4ade80',
-  delColor: '#5c6757',
-  mark: {
-    background: 'rgba(74,222,128,.22)',
-    color: '#b8f2c6',
-    borderRadius: '3px',
-    padding: '1px 4px',
-  },
-  footnote: {
-    refColor: '#4ade80',
-    blockBorder: '#1e2a24',
-    textColor: '#7c8a77',
-    numColor: '#4ade80',
-    textSize: '12px',
-  },
-  codePalette: PALETTE_DARK,
-  codePaletteMode: 'dark',
-}
-
 /** 静蓝笔记：靛蓝强调 + 冷灰正文，技术文档气质 */
 export const indigoTheme: Theme = {
   id: 'indigo',
   name: '静蓝笔记',
   description: '靛蓝强调 + 冷灰正文，技术文档气质',
-  appearance: 'light',
   mono: MONO,
   body: { font: SANS, fontSize: '16px', lineHeight: '1.8', color: '#2f3540' },
   accent: '#3f6ecc',
@@ -714,7 +566,6 @@ export const inkTheme: Theme = {
   id: 'ink',
   name: '松墨',
   description: '墨绿强调 + 宋体标题 + 大留白，书卷气',
-  appearance: 'light',
   mono: MONO,
   body: {
     font: SERIF,
@@ -812,7 +663,6 @@ export const sakuraTheme: Theme = {
   id: 'sakura',
   name: '樱雪',
   description: '柔粉强调 + 圆润卡片，轻盈通透',
-  appearance: 'light',
   mono: MONO,
   body: {
     font: SANS,
@@ -910,7 +760,6 @@ export const minimalTheme: Theme = {
   id: 'minimal',
   name: '极简灰',
   description: '中性灰阶 + 零装饰，只剩排版本身',
-  appearance: 'light',
   mono: MONO,
   body: { font: SANS, fontSize: '16px', lineHeight: '1.8', color: '#3a3a3a' },
   accent: '#5c5c5c',
@@ -1003,7 +852,6 @@ export const typewriterTheme: Theme = {
   id: 'typewriter',
   name: '打字机',
   description: '等宽正文 + 牛皮纸底，打字稿气质',
-  appearance: 'light',
   mono: MONO,
   body: {
     font: MONO,
@@ -1097,304 +945,6 @@ export const typewriterTheme: Theme = {
   codePaletteMode: 'light',
 }
 
-/** 午夜靛：深靛蓝底 + 青蓝强调，暗色阅读但不刺眼 */
-export const midnightTheme: Theme = {
-  id: 'midnight',
-  name: '午夜靛',
-  description: '深靛底 + 青蓝强调，暗色长读不刺眼',
-  appearance: 'dark',
-  mono: MONO,
-  body: {
-    font: SANS,
-    fontSize: '16px',
-    lineHeight: '1.85',
-    color: '#c3cbd9',
-    bg: '#161b26',
-  },
-  accent: '#61b6f2',
-  accentSoft: 'rgba(97,182,242,.13)',
-  heading: {
-    font: SANS,
-    fontWeight: '700',
-    color: '#eaf1fb',
-    lineHeight: '1.42',
-    letterSpacing: '0.2px',
-    marginTop: '30px',
-    marginBottom: '13px',
-    decor: 'accent-bar',
-  },
-  headingSizes: {
-    h1: '27px',
-    h2: '23px',
-    h3: '20px',
-    h4: '18px',
-    h5: '17px',
-    h6: '16px',
-  },
-  pMargin: '17px',
-  quote: {
-    background: 'rgba(97,182,242,.07)',
-    color: '#aab6c8',
-    borderLeft: '3px solid #61b6f2',
-    borderRadius: '0 8px 8px 0',
-    padding: '12px 16px',
-    margin: '22px 0',
-  },
-  callout: {
-    background: 'rgba(97,182,242,.12)',
-    color: '#c3cbd9',
-    borderLeft: '3px solid #61b6f2',
-    borderRadius: '0 10px 10px 0',
-    padding: '14px 16px',
-    margin: '22px 0',
-    badgeColor: '#8fd0ff',
-  },
-  code: {
-    background: 'rgba(255,255,255,.08)',
-    color: '#d8e3f2',
-    borderRadius: '4px',
-    padding: '2px 5px',
-    fontSize: '0.9em',
-  },
-  codeBlock: {
-    background: '#0f131c',
-    color: '#d3dcea',
-    borderRadius: '8px',
-    padding: '15px 17px',
-    fontSize: '13.5px',
-    lineHeight: '1.65',
-    extra: { border: '1px solid rgba(255,255,255,.07)' },
-  },
-  link: { color: '#61b6f2', textDecoration: 'underline' },
-  listPaddingLeft: '26px',
-  listItemMargin: '6px 0',
-  table: {
-    borderColor: 'rgba(255,255,255,.12)',
-    headBg: 'rgba(255,255,255,.06)',
-    headColor: '#eaf1fb',
-    fontSize: '15px',
-    cellPadding: '8px 12px',
-  },
-  hr: { color: 'rgba(255,255,255,.12)', margin: '30px 0' },
-  img: { borderRadius: '8px', margin: '18px auto' },
-  strongColor: '#eaf1fb',
-  delColor: '#6d7688',
-  mark: {
-    background: 'rgba(97,182,242,.25)',
-    color: '#eaf1fb',
-    borderRadius: '3px',
-    padding: '1px 4px',
-  },
-  footnote: {
-    refColor: '#61b6f2',
-    blockBorder: 'rgba(255,255,255,.12)',
-    textColor: '#8b95a6',
-    numColor: '#61b6f2',
-    textSize: '12px',
-  },
-  codePalette: PALETTE_DARK,
-  codePaletteMode: 'dark',
-}
-
-/** 石墨：中性暖黑 + 琥珀强调，长时间夜间写作不刺眼 */
-export const graphiteTheme: Theme = {
-  id: 'graphite',
-  name: '石墨',
-  description: '中性暖黑 + 琥珀强调，沉稳耐看',
-  appearance: 'dark',
-  mono: MONO,
-  body: {
-    font: SANS,
-    fontSize: '16px',
-    lineHeight: '1.85',
-    color: '#d2cec6',
-    bg: '#1c1c1e',
-  },
-  accent: '#e8a33d',
-  accentSoft: 'rgba(232,163,61,.13)',
-  heading: {
-    font: SANS,
-    fontWeight: '700',
-    color: '#f5f2ec',
-    lineHeight: '1.42',
-    letterSpacing: '0.2px',
-    marginTop: '30px',
-    marginBottom: '13px',
-    decor: 'accent-bar',
-  },
-  headingSizes: {
-    h1: '27px',
-    h2: '23px',
-    h3: '20px',
-    h4: '18px',
-    h5: '17px',
-    h6: '16px',
-  },
-  pMargin: '17px',
-  quote: {
-    background: 'rgba(232,163,61,.07)',
-    color: '#bab5ab',
-    borderLeft: '3px solid #e8a33d',
-    borderRadius: '0 8px 8px 0',
-    padding: '12px 16px',
-    margin: '22px 0',
-  },
-  callout: {
-    background: 'rgba(232,163,61,.12)',
-    color: '#d2cec6',
-    borderLeft: '3px solid #e8a33d',
-    borderRadius: '0 10px 10px 0',
-    padding: '14px 16px',
-    margin: '22px 0',
-    badgeColor: '#f0bc6e',
-  },
-  code: {
-    background: 'rgba(255,255,255,.08)',
-    color: '#e6e1d8',
-    borderRadius: '4px',
-    padding: '2px 5px',
-    fontSize: '0.9em',
-  },
-  codeBlock: {
-    background: '#141416',
-    color: '#ddd8ce',
-    borderRadius: '8px',
-    padding: '15px 17px',
-    fontSize: '13.5px',
-    lineHeight: '1.65',
-    extra: { border: '1px solid rgba(255,255,255,.07)' },
-  },
-  link: { color: '#e8a33d', textDecoration: 'underline' },
-  listPaddingLeft: '26px',
-  listItemMargin: '6px 0',
-  table: {
-    borderColor: 'rgba(255,255,255,.12)',
-    headBg: 'rgba(255,255,255,.06)',
-    headColor: '#f5f2ec',
-    fontSize: '15px',
-    cellPadding: '8px 12px',
-  },
-  hr: { color: 'rgba(255,255,255,.12)', margin: '30px 0' },
-  img: { borderRadius: '8px', margin: '18px auto' },
-  strongColor: '#f5f2ec',
-  delColor: '#7d786f',
-  mark: {
-    background: 'rgba(232,163,61,.25)',
-    color: '#f5f2ec',
-    borderRadius: '3px',
-    padding: '1px 4px',
-  },
-  footnote: {
-    refColor: '#e8a33d',
-    blockBorder: 'rgba(255,255,255,.12)',
-    textColor: '#969085',
-    numColor: '#e8a33d',
-    textSize: '12px',
-  },
-  codePalette: PALETTE_DARK,
-  codePaletteMode: 'dark',
-}
-
-/** 夜樱：紫黑纸底 + 樱粉强调 + 衬线标题，暗色里的文艺一挂 */
-export const nightSakuraTheme: Theme = {
-  id: 'night-sakura',
-  name: '夜樱',
-  description: '紫黑底 + 樱粉强调 + 衬线标题',
-  appearance: 'dark',
-  mono: MONO,
-  body: {
-    font: SANS,
-    fontSize: '16px',
-    lineHeight: '1.9',
-    color: '#d3c8d6',
-    bg: '#1a1520',
-  },
-  accent: '#e07a9f',
-  accentSoft: 'rgba(224,122,159,.13)',
-  heading: {
-    font: SERIF,
-    fontWeight: '700',
-    color: '#f6ecf2',
-    lineHeight: '1.45',
-    letterSpacing: '0.6px',
-    marginTop: '32px',
-    marginBottom: '14px',
-    decor: 'underline',
-  },
-  headingSizes: {
-    h1: '27px',
-    h2: '23px',
-    h3: '20px',
-    h4: '18px',
-    h5: '17px',
-    h6: '16px',
-  },
-  pMargin: '18px',
-  quote: {
-    background: 'rgba(224,122,159,.07)',
-    color: '#bcb0c0',
-    borderLeft: '3px solid #e07a9f',
-    borderRadius: '0 8px 8px 0',
-    padding: '12px 16px',
-    margin: '24px 0',
-    fontStyle: 'italic',
-  },
-  callout: {
-    background: 'rgba(224,122,159,.12)',
-    color: '#d3c8d6',
-    borderLeft: '3px solid #e07a9f',
-    borderRadius: '0 10px 10px 0',
-    padding: '14px 16px',
-    margin: '24px 0',
-    badgeColor: '#f0a3bf',
-  },
-  code: {
-    background: 'rgba(255,255,255,.08)',
-    color: '#ecdfe6',
-    borderRadius: '4px',
-    padding: '2px 5px',
-    fontSize: '0.9em',
-  },
-  codeBlock: {
-    background: '#130f18',
-    color: '#ddd2e0',
-    borderRadius: '8px',
-    padding: '15px 17px',
-    fontSize: '13.5px',
-    lineHeight: '1.65',
-    extra: { border: '1px solid rgba(255,255,255,.07)' },
-  },
-  link: { color: '#e07a9f', textDecoration: 'underline' },
-  listPaddingLeft: '26px',
-  listItemMargin: '7px 0',
-  table: {
-    borderColor: 'rgba(255,255,255,.12)',
-    headBg: 'rgba(255,255,255,.06)',
-    headColor: '#f6ecf2',
-    fontSize: '15px',
-    cellPadding: '8px 12px',
-  },
-  hr: { color: 'rgba(255,255,255,.12)', margin: '32px 0' },
-  img: { borderRadius: '10px', margin: '18px auto' },
-  strongColor: '#f6ecf2',
-  delColor: '#8a7f8d',
-  mark: {
-    background: 'rgba(224,122,159,.25)',
-    color: '#f6ecf2',
-    borderRadius: '3px',
-    padding: '1px 4px',
-  },
-  footnote: {
-    refColor: '#e07a9f',
-    blockBorder: 'rgba(255,255,255,.12)',
-    textColor: '#9a8fa0',
-    numColor: '#e07a9f',
-    textSize: '12px',
-  },
-  codePalette: PALETTE_DARK,
-  codePaletteMode: 'dark',
-}
-
 export const themes: Theme[] = [
   classicTheme,
   minimalTheme,
@@ -1404,19 +954,9 @@ export const themes: Theme[] = [
   sakuraTheme,
   typewriterTheme,
   indigoTheme,
-  darkTheme,
-  midnightTheme,
-  graphiteTheme,
-  nightSakuraTheme,
 ]
 
 /** 按 id 取主题，找不到回退经典 */
-/** 浅色 / 深色分组（主题栏分区展示，深色排在后面需要滚动才看到） */
-export const lightThemes: Theme[] = themes.filter(
-  (t) => t.appearance === 'light',
-)
-export const darkThemes: Theme[] = themes.filter((t) => t.appearance === 'dark')
-
 export function getTheme(id?: string): Theme {
   return themes.find((t) => t.id === id) ?? classicTheme
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { cn } from 'cn'
 import {
   BatteryFull,
@@ -12,9 +12,11 @@ import {
 import { TooltipHint } from '@/components/ui/tooltip'
 import { extractTitle, stripFirstH1 } from '@/core/markdown/markdown'
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync'
+import { applyPreviewDarkmode } from '@/core/theme/previewDarkmode'
 import type { Theme } from '@/core/theme/theme'
 
 interface Props {
+  darkPreview: boolean
   body: string
   theme: Theme
   /**
@@ -169,9 +171,16 @@ function buildAnchors(scroll: HTMLElement): Anchor[] {
  * - desktop is a macOS window with a traffic-light title bar
  * - article head on top (title plus byline), action bar at the end of the content
  * Every style in the body HTML is inline ⇒ preview and export (the WeChat
- * paste) are identical.
+ * paste) are identical before the optional preview-only dark conversion.
  */
-export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
+export default function PreviewPane({
+  body,
+  theme,
+  resizeKey,
+  sync,
+  darkPreview,
+}: Props) {
+  const screenRef = useRef<HTMLDivElement>(null)
   const paneRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -300,7 +309,7 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
   }, [])
 
   // Follow the article theme in the status bar and desktop window chrome
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.style.setProperty('--art-accent', theme.accent)
     document.documentElement.style.setProperty(
       '--art-heading',
@@ -331,15 +340,19 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
     }
   }, [theme])
 
+  useLayoutEffect(() => {
+    if (darkPreview && screenRef.current) {
+      return applyPreviewDarkmode(screenRef.current)
+    }
+  }, [darkPreview, previewBody, theme, device])
+
   return (
     <section
       className="split-pane preview-side"
       ref={paneRef}
       data-width={layout}
       data-device={device}
-      // The web build has no shell dark mode: the paper decides, so a dark
-      // theme gets the Night Sky pad and a light one Star White
-      data-appearance={theme.appearance}
+      data-appearance={darkPreview ? 'dark' : 'light'}
     >
       <div className="preview-toolbar">
         <div
@@ -379,7 +392,7 @@ export default function PreviewPane({ body, theme, resizeKey, sync }: Props) {
           <span className="side-btn vol-up" aria-hidden="true"></span>
           <span className="side-btn vol-down" aria-hidden="true"></span>
           <span className="side-btn power" aria-hidden="true"></span>
-          <div className="phone-screen">
+          <div className="phone-screen" ref={screenRef}>
             {/* macOS window title bar (desktop mode) */}
             <div className="desktop-bar">
               <span className="traffic t1"></span>
