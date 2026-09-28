@@ -12,6 +12,7 @@ const CONFIG_FILE: &str = "workspace.json";
 
 pub struct WorkspaceState {
     current: Mutex<Option<CurrentWorkspace>>,
+    pub(crate) trash_lock: Mutex<()>,
     next_token: AtomicU64,
 }
 
@@ -24,6 +25,7 @@ impl Default for WorkspaceState {
     fn default() -> Self {
         Self {
             current: Mutex::new(None),
+            trash_lock: Mutex::new(()),
             next_token: AtomicU64::new(1),
         }
     }
@@ -256,7 +258,7 @@ pub fn unique_path(directory: &Path, desired_name: &str) -> PathBuf {
     candidate
 }
 
-fn classify(name: &str) -> &'static str {
+pub(crate) fn classify(name: &str) -> &'static str {
     let extension = Path::new(name)
         .extension()
         .map(|value| value.to_string_lossy().to_ascii_lowercase())

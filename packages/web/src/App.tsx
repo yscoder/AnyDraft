@@ -62,8 +62,18 @@ import { downscaleImage } from '@/core/image/images'
 import { createScrollSyncChannel } from '@/core/editor/scrollSync'
 import { findReferencedImages } from '@/core/drafts/assets'
 import { locateImage } from '@/core/drafts/locate'
-import { baseNamePath, dataUrlToBlob, dirnamePath } from '@/core/fs/fsa'
-import type { AppRuntime, ContentRepository, RepoNode } from '@any-draft/shared'
+import {
+  baseNamePath,
+  dataUrlToBlob,
+  dirnamePath,
+  joinPath,
+} from '@/core/fs/fsa'
+import type {
+  AppRuntime,
+  ContentRepository,
+  RepoNode,
+  TrashEntry,
+} from '@any-draft/shared'
 import { readStored, writeStored } from '@/core/storage'
 import { createRuntime } from '@/core/runtime/createRuntime'
 import './styles/index.css'
@@ -108,6 +118,14 @@ export default function App() {
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [nodes, setNodes] = useState<RepoNode[]>([])
+  const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([])
+  const [trashNodes, setTrashNodes] = useState<Record<string, RepoNode[]>>({})
+  const [trashDocument, setTrashDocument] = useState<{
+    id: string
+    relativePath: string
+    originalPath: string
+    content: string
+  } | null>(null)
   const [contents, setContents] = useState<Record<string, string>>({})
   const [activePath, setActivePath] = useState('')
   /** 图片：文件名（basename）→ 可用于 <img> 的 URL（Web 为 blob:） */
@@ -118,6 +136,7 @@ export default function App() {
   const documentLoadRef = useRef(0)
   const markdownRef = useRef('')
   const diskContentsRef = useRef<Record<string, string>>({})
+  const suspendedSavePathsRef = useRef(new Set<string>())
   /** 异步目录操作进行中：期间跳过「选中项失效」的自动兜底，避免竞态 */
   const mutatingRef = useRef(false)
 
@@ -153,19 +172,34 @@ export default function App() {
     () => nodes.filter((n) => n.kind === 'image'),
     [nodes],
   )
-  const activeDraft = activePath
+  const trashSourceEntry = trashDocument
+    ? trashEntries.find((entry) => entry.id === trashDocument.id)
+    : undefined
+  const trashVirtualNodes = useMemo(
+    () =>
+      trashSourceEntry?.kind === 'dir'
+        ? (trashNodes[trashSourceEntry.id] ?? []).map((node) => ({
+            ...node,
+            path: joinPath(trashSourceEntry.originalPath, node.path),
+          }))
+        : [],
+    [trashSourceEntry, trashNodes],
+  )
+  const draftPath = trashDocument?.originalPath ?? activePath
+  const activeDraft = draftPath
     ? {
-        id: activePath,
-        name: baseNamePath(activePath).replace(/\.(md|markdown)$/i, ''),
-        content: contents[activePath] ?? '',
+        id: draftPath,
+        name: baseNamePath(draftPath).replace(/\.(md|markdown)$/i, ''),
+        content: trashDocument?.content ?? contents[activePath] ?? '',
         updatedAt: Date.now(),
       }
     : null
-  const markdown = activePath ? (contents[activePath] ?? '') : ''
+  const markdown =
+    trashDocument?.content ?? (activePath ? (contents[activePath] ?? '') : '')
   markdownRef.current = markdown
 
   const setMarkdown = (v: string) => {
-    if (!activePath) return
+    if (!activePath || trashDocument) return
     setContents((prev) =>
       prev[activePath] === v ? prev : { ...prev, [activePath]: v },
     )
@@ -187,8 +221,14 @@ export default function App() {
   const countClass = `pane-stat count ${countLevel === 'warn' ? 'count-warn' : countLevel === 'over' ? 'count-over' : ''}`
 
   const referencedImages = useMemo(
-    () => (activePath ? findReferencedImages(activePath, markdown, nodes) : []),
-    [activePath, markdown, nodes],
+    () =>
+      draftPath
+        ? findReferencedImages(draftPath, markdown, [
+            ...trashVirtualNodes,
+            ...nodes,
+          ])
+        : [],
+    [draftPath, markdown, nodes, trashVirtualNodes],
   )
   const referencedImageSignature = referencedImages
     .map(
@@ -266,12 +306,24 @@ export default function App() {
       for (const url of Object.values(previous)) URL.revokeObjectURL(url)
       return {}
     })
-    if (repoStatus !== 'ready' || !repo || !activePath) return
+    if (repoStatus !== 'ready' || !repo || !draftPath) return
 
     void Promise.all(
       referencedImages.map(async ({ name, node }) => {
         try {
-          return { name, url: await repo.imageUrl(node.path) }
+          const relativePath =
+            trashSourceEntry?.kind === 'dir'
+              ? trashNodes[trashSourceEntry.id]?.find(
+                  (item) =>
+                    joinPath(trashSourceEntry.originalPath, item.path) ===
+                    node.path,
+                )?.path
+              : undefined
+          const url =
+            relativePath && trashSourceEntry
+              ? await repo.trashImageUrl(trashSourceEntry.id, relativePath)
+              : await repo.imageUrl(node.path)
+          return { name, url }
         } catch (error) {
           console.warn(`图片加载失败：${node.path}`, error)
           return null
@@ -293,7 +345,7 @@ export default function App() {
     }
     // referencedImageSignature 已包含图片路径和文件元数据，避免正文普通输入重复读取图片。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePath, referencedImageSignature, repoStatus])
+  }, [draftPath, trashDocument?.id, referencedImageSignature, repoStatus])
 
   /* ---------------- 工作目录初始化 ---------------- */
   useEffect(() => {
@@ -334,6 +386,24 @@ export default function App() {
     return all
   }
 
+  const scanTrash = async (repo: ContentRepository): Promise<void> => {
+    const entries = await repo.listTrash()
+    if (repo !== repoRef.current) return
+    setTrashEntries(entries)
+    setTrashNodes((current) => {
+      const ids = new Set(entries.map((entry) => entry.id))
+      if (Object.keys(current).every((id) => ids.has(id))) return current
+      return Object.fromEntries(
+        Object.entries(current).filter(([id]) => ids.has(id)),
+      )
+    })
+    setTrashDocument((current) =>
+      current && !entries.some((entry) => entry.id === current.id)
+        ? null
+        : current,
+    )
+  }
+
   const clearActiveFile = () => {
     documentLoadRef.current += 1
     activePathRef.current = ''
@@ -345,7 +415,7 @@ export default function App() {
   const refreshRepo = async (): Promise<RepoNode[]> => {
     const repo = repoRef.current
     if (!repo) return []
-    const all = await scanRepo(repo)
+    const [all] = await Promise.all([scanRepo(repo), scanTrash(repo)])
     const cur = activePathRef.current
     if (
       cur &&
@@ -367,6 +437,8 @@ export default function App() {
       if (request !== documentLoadRef.current || repo !== repoRef.current)
         return
       diskContentsRef.current[path] = content
+      suspendedSavePathsRef.current.delete(path)
+      setTrashDocument(null)
       setContents((previous) => ({ ...previous, [path]: content }))
       activePathRef.current = path
       setActivePath(path)
@@ -378,20 +450,48 @@ export default function App() {
     }
   }
 
+  const openTrashMarkdown = async (id: string, relativePath: string) => {
+    const repo = repoRef.current
+    const entry = trashEntries.find((item) => item.id === id)
+    if (!repo || !entry) return
+    const request = ++documentLoadRef.current
+    try {
+      const content = await repo.readTrashText(id, relativePath)
+      if (request !== documentLoadRef.current || repo !== repoRef.current)
+        return
+      clearActiveFile()
+      setTrashDocument({
+        id,
+        relativePath,
+        originalPath: relativePath
+          ? `${entry.originalPath}/${relativePath}`
+          : entry.originalPath,
+        content,
+      })
+    } catch {
+      flash('回收站文档读取失败', 'error')
+    }
+  }
+
   const openRepo = async (repo: ContentRepository): Promise<void> => {
     documentLoadRef.current += 1
     setSearchOpen(false)
+    setConfirmation(null)
     repoRef.current = repo
     setRootName(repo.rootName || '浏览器内置存储')
     activePathRef.current = ''
     setActivePath('')
     setContents({})
+    setTrashDocument(null)
+    setTrashEntries([])
+    setTrashNodes({})
     diskContentsRef.current = {}
+    suspendedSavePathsRef.current.clear()
     setImageUrls((previous) => {
       for (const url of Object.values(previous)) URL.revokeObjectURL(url)
       return {}
     })
-    await scanRepo(repo)
+    await Promise.all([scanRepo(repo), scanTrash(repo)])
     setRepoStatus('ready')
   }
 
@@ -428,6 +528,7 @@ export default function App() {
     setSaveFailed(false)
     let started = false
     const timer = window.setTimeout(() => {
+      if (suspendedSavePathsRef.current.has(path)) return
       started = true
       const toWrite = markdown
       void repo
@@ -446,7 +547,12 @@ export default function App() {
     }, 300)
     return () => {
       window.clearTimeout(timer)
-      if (started || diskContentsRef.current[path] === markdown) return
+      if (
+        started ||
+        suspendedSavePathsRef.current.has(path) ||
+        diskContentsRef.current[path] === markdown
+      )
+        return
       void repo
         .writeTextFile(path, markdown)
         .then(() => {
@@ -469,7 +575,8 @@ export default function App() {
       if (document.visibilityState !== 'hidden') return
       const { path, content, clean } = saveStateRef.current
       const repo = repoRef.current
-      if (!repo || !path || clean) return
+      if (!repo || !path || clean || suspendedSavePathsRef.current.has(path))
+        return
       void repo
         .writeTextFile(path, content)
         .then(() => {
@@ -650,17 +757,100 @@ export default function App() {
     if (!repo || !node) return
     const isDir = node.kind === 'dir'
     setConfirmation({
-      title: isDir ? '删除文件夹？' : '删除文件？',
-      description: `「${node.name}」${isDir ? '及其全部内容' : ''}将被永久删除，此操作无法撤销。`,
-      actionLabel: isDir ? '删除文件夹' : '删除文件',
+      title: '移到回收站？',
+      description: `「${node.name}」${isDir ? '及其全部内容' : ''}将移到回收站，可以稍后恢复。`,
+      actionLabel: '移到回收站',
       onConfirm: () =>
         runMutation(async () => {
           try {
-            await repo.removeNode(path)
+            const current = activePathRef.current
+            const deletingActive =
+              current === path || current.startsWith(`${path}/`)
+            if (deletingActive) {
+              suspendedSavePathsRef.current.add(current)
+              const content = markdownRef.current
+              if (content !== diskContentsRef.current[current]) {
+                await repo.writeTextFile(current, content)
+                diskContentsRef.current[current] = content
+              }
+            }
+            await repo.trashNode(path)
             await refreshRepo()
-            flash(`已删除「${node.name}」`, 'success')
+            flash(`已移到回收站：「${node.name}」`, 'success')
           } catch {
+            suspendedSavePathsRef.current.delete(activePathRef.current)
             flash('删除失败', 'error')
+          }
+        }),
+    })
+  }
+
+  const loadTrashNodes = (id: string) => {
+    const repo = repoRef.current
+    if (!repo || trashNodes[id]) return
+    void repo
+      .listTrashNodes(id)
+      .then((nodes) =>
+        setTrashNodes((current) => ({ ...current, [id]: nodes })),
+      )
+      .catch(() => flash('回收站文件夹读取失败', 'error'))
+  }
+
+  const handleRestoreTrash = (entry: TrashEntry) => {
+    const repo = repoRef.current
+    if (!repo) return
+    void runMutation(async () => {
+      try {
+        const restored = await repo.restoreTrash(entry.id)
+        setTrashNodes((current) => {
+          const next = { ...current }
+          delete next[entry.id]
+          return next
+        })
+        await refreshRepo()
+        flash(`已恢复到「${restored}」`, 'success')
+      } catch (error) {
+        flash(error instanceof Error ? error.message : '恢复失败', 'error')
+      }
+    })
+  }
+
+  const handleDeleteTrash = (entry: TrashEntry) => {
+    const repo = repoRef.current
+    if (!repo) return
+    setConfirmation({
+      title: '彻底删除？',
+      description: `「${entry.name}」将被永久删除，此操作无法撤销。`,
+      actionLabel: '彻底删除',
+      onConfirm: () =>
+        runMutation(async () => {
+          try {
+            await repo.removeTrash(entry.id)
+            await refreshRepo()
+            flash(`已彻底删除「${entry.name}」`, 'success')
+          } catch {
+            flash('彻底删除失败', 'error')
+          }
+        }),
+    })
+  }
+
+  const handleEmptyTrash = () => {
+    const repo = repoRef.current
+    if (!repo || !trashEntries.length) return
+    setConfirmation({
+      title: '清空回收站？',
+      description: `回收站中的 ${trashEntries.length} 个项目将被永久删除，此操作无法撤销。`,
+      actionLabel: '清空回收站',
+      onConfirm: () =>
+        runMutation(async () => {
+          try {
+            for (const entry of trashEntries) await repo.removeTrash(entry.id)
+            flash('回收站已清空', 'success')
+          } catch {
+            flash('清空回收站失败，请刷新后重试', 'error')
+          } finally {
+            await refreshRepo().catch(() => {})
           }
         }),
     })
@@ -738,6 +928,7 @@ export default function App() {
     if (repo !== repoRef.current || request !== documentLoadRef.current)
       return false
     if (overlay === undefined) diskContentsRef.current[path] = content
+    setTrashDocument(null)
     setContents((previous) => ({ ...previous, [path]: content }))
     activePathRef.current = path
     setActivePath(path)
@@ -1054,6 +1245,13 @@ export default function App() {
             onSearch={() => setSearchOpen(true)}
             rootName={rootName}
             tree={tree}
+            trash={trashEntries}
+            trashNodes={trashNodes}
+            activeTrashKey={
+              trashDocument
+                ? `${trashDocument.id}:${trashDocument.relativePath}`
+                : ''
+            }
             activePath={activePath}
             onSelect={(path) => void openMarkdown(path)}
             onCreateMarkdown={handleCreateMarkdown}
@@ -1063,6 +1261,11 @@ export default function App() {
             onChangeRoot={() => void handlePickRoot()}
             onRefresh={handleRefresh}
             onLocateImage={handleLocateImage}
+            onOpenTrashMarkdown={(id, path) => void openTrashMarkdown(id, path)}
+            onRestoreTrash={handleRestoreTrash}
+            onDeleteTrash={handleDeleteTrash}
+            onEmptyTrash={handleEmptyTrash}
+            onLoadTrashNodes={loadTrashNodes}
           />
         </SidebarContent>
         <SidebarLinks />
@@ -1102,7 +1305,7 @@ export default function App() {
               onExportBackup={() => void handleExportBackup()}
               onExportImage={() => void handleExportImage()}
               exporting={exporting}
-              hasActiveDraft={Boolean(activeDraft)}
+              hasActiveDraft={Boolean(activeDraft && !trashDocument)}
             />
           </div>
           {activeDraft ? (
@@ -1121,11 +1324,17 @@ export default function App() {
                 minSize={isNarrow ? MIN_EDITOR_HEIGHT_PX : MIN_EDITOR_PX}
               >
                 <EditorPane
+                  key={trashDocument ? 'trash' : 'workspace'}
                   value={markdown}
                   onChange={setMarkdown}
+                  readOnly={Boolean(trashDocument)}
                   onAddImage={handleAddImage}
                   imageNames={availableImageNames}
-                  fileKey={activePath}
+                  fileKey={
+                    trashDocument
+                      ? `trash:${trashDocument.id}:${trashDocument.relativePath}`
+                      : activePath
+                  }
                   sync={scrollSync}
                   jumpRequest={jumpRequest}
                   collapsed={isPreviewOnly}
@@ -1204,7 +1413,13 @@ export default function App() {
                 <span
                   className={`pane-stat save-state ${saveFailed ? 'text-destructive' : ''}`}
                 >
-                  {saveFailed ? '保存失败' : saved ? '已保存' : '保存中'}
+                  {trashDocument
+                    ? '回收站 · 只读'
+                    : saveFailed
+                      ? '保存失败'
+                      : saved
+                        ? '已保存'
+                        : '保存中'}
                 </span>
               </div>
               <ThemeControls

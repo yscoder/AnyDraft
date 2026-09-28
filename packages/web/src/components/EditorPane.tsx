@@ -18,7 +18,7 @@ import {
   Undo2,
 } from 'lucide-react'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import {
   defaultKeymap,
   history,
@@ -51,6 +51,7 @@ interface Props {
   imageNames: string[]
   /** 当前文档路径：切换文档时强制同步 doc */
   fileKey: string
+  readOnly?: boolean
   /** 滚动同步通道：把编辑器顶部对应的源码位置发布给预览 */
   sync: ScrollSyncChannel
   /** 预览模式：面板收起 */
@@ -77,6 +78,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     onAddImage,
     imageNames,
     fileKey,
+    readOnly = false,
     sync,
     collapsed,
     outlineOpen,
@@ -86,6 +88,9 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const editable = useMemo(() => new Compartment(), [])
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
   const syncRef = useRef(sync)
@@ -100,6 +105,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   onAddImageRef.current = onAddImage
   /** 逐张保存图片，成功后回填 ![[name]] 到光标处 */
   const insertImages = async (files: File[]) => {
+    if (readOnlyRef.current) return
     const view = viewRef.current
     if (!view) return
     const names: string[] = []
@@ -131,6 +137,10 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       state: EditorState.create({
         doc: value,
         extensions: [
+          editable.of([
+            EditorState.readOnly.of(readOnly),
+            EditorView.editable.of(!readOnly),
+          ]),
           lineNumbers(),
           history(),
           keymap.of([
@@ -254,6 +264,15 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: editable.reconfigure([
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
+      ]),
+    })
+  }, [editable, readOnly])
+
   // 内容同步：文档切换（fileKey 变化）或外部 value 变化（导入/刷新）时，
   // 若 doc 与 value 不同则全量替换并尽量保持光标。
   // 编辑/撤销产生的变化经 updateListener 已即时写回 value（cur === value），
@@ -312,6 +331,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     if (!view) return
     const dom = view.dom
     const onPaste = (e: ClipboardEvent) => {
+      if (readOnlyRef.current) return
       const files = Array.from(e.clipboardData?.items ?? [])
         .filter((it) => it.type.startsWith('image/'))
         .map((it) => it.getAsFile())
@@ -321,6 +341,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       void insertImages(files)
     }
     const onDrop = (e: DragEvent) => {
+      if (readOnlyRef.current) return
       const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
         f.type.startsWith('image/'),
       )
@@ -347,10 +368,12 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     const view = viewRef.current
     return view ? fn(view) : null
   }
+  const withEditableView = <T,>(fn: (view: EditorView) => T): T | null =>
+    readOnlyRef.current ? null : withView(fn)
 
   /** 包裹选区（加粗/斜体/行内码）；无选区时插入成对标记并置光标于中间 */
   const wrapSelection = (before: string, after: string) =>
-    withView((view) => {
+    withEditableView((view) => {
       const { from, to } = view.state.selection.main
       const text = view.state.doc.sliceString(from, to)
       const sel = text
@@ -365,7 +388,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
 
   /** 行首加前缀（标题/引用/列表/待办）；光标所在行整行加 */
   const prefixLine = (prefix: string) =>
-    withView((view) => {
+    withEditableView((view) => {
       const line = view.state.doc.lineAt(view.state.selection.main.head)
       view.dispatch({
         changes: { from: line.from, insert: prefix },
@@ -376,7 +399,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
 
   /** 光标处插入块（代码围栏/分割线/表格） */
   const insertBlock = (text: string) =>
-    withView((view) => {
+    withEditableView((view) => {
       const head = view.state.selection.main.head
       view.dispatch({
         changes: { from: head, insert: text },
@@ -387,14 +410,14 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
 
   /** 撤销（CodeMirror 历史栈） */
   const undoEdit = () =>
-    withView((view) => {
+    withEditableView((view) => {
       undo(view)
       view.focus()
     })
 
   /** 插入 3×3 表格模板（光标置于表体首格） */
   const insertTable = () =>
-    withView((view) => {
+    withEditableView((view) => {
       const head = view.state.selection.main.head
       const table =
         '\n| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|  |  |  |\n'
@@ -540,68 +563,70 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       inert={collapsed}
     >
       {/* Markdown 格式工具栏 */}
-      <div className="md-toolbar" role="toolbar" aria-label="Markdown 格式">
-        {/* 标题层级下拉 */}
-        <div className="md-toolbar-dropdown" ref={headingWrapRef}>
-          <TooltipHint content="标题（H1–H4）">
-            <button
-              className="md-toolbar-btn"
-              aria-label="标题"
-              aria-expanded={headingOpen}
-              aria-haspopup="menu"
-              onClick={(e) => {
-                e.stopPropagation()
-                setHeadingOpen((v) => !v)
-              }}
-            >
-              <Heading size={ICON} />
-            </button>
-          </TooltipHint>
-          {headingOpen && (
-            <div className="md-toolbar-menu" role="menu">
-              {headingLevels.map((h) => {
-                const HeadingIcon =
-                  HEADING_ICON[h.level as keyof typeof HEADING_ICON]
-                return (
-                  <button
-                    key={h.level}
-                    role="menuitem"
-                    onClick={() => {
-                      setHeadingOpen(false)
-                      prefixLine(h.prefix)
-                    }}
-                  >
-                    <HeadingIcon size={17} className="menu-heading" />
-                    {h.label.split('·')[1]?.trim()}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-        {toolbarBtns
-          .map((b) => (
-            <TooltipHint key={b.key} content={b.title}>
+      {!readOnly && (
+        <div className="md-toolbar" role="toolbar" aria-label="Markdown 格式">
+          {/* 标题层级下拉 */}
+          <div className="md-toolbar-dropdown" ref={headingWrapRef}>
+            <TooltipHint content="标题（H1–H4）">
               <button
                 className="md-toolbar-btn"
-                aria-label={b.title}
-                onClick={b.onClick}
+                aria-label="标题"
+                aria-expanded={headingOpen}
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setHeadingOpen((v) => !v)
+                }}
               >
-                {b.icon}
+                <Heading size={ICON} />
               </button>
             </TooltipHint>
-          ))
-          .reduce<React.ReactNode[]>((acc, btn, i) => {
-            // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
-            const groupEnd = [2, 5, 9]
-            acc.push(btn)
-            if (groupEnd.includes(i))
-              acc.push(
-                <span key={`d${i}`} className="md-toolbar-divider"></span>,
-              )
-            return acc
-          }, [])}
-      </div>
+            {headingOpen && (
+              <div className="md-toolbar-menu" role="menu">
+                {headingLevels.map((h) => {
+                  const HeadingIcon =
+                    HEADING_ICON[h.level as keyof typeof HEADING_ICON]
+                  return (
+                    <button
+                      key={h.level}
+                      role="menuitem"
+                      onClick={() => {
+                        setHeadingOpen(false)
+                        prefixLine(h.prefix)
+                      }}
+                    >
+                      <HeadingIcon size={17} className="menu-heading" />
+                      {h.label.split('·')[1]?.trim()}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          {toolbarBtns
+            .map((b) => (
+              <TooltipHint key={b.key} content={b.title}>
+                <button
+                  className="md-toolbar-btn"
+                  aria-label={b.title}
+                  onClick={b.onClick}
+                >
+                  {b.icon}
+                </button>
+              </TooltipHint>
+            ))
+            .reduce<React.ReactNode[]>((acc, btn, i) => {
+              // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
+              const groupEnd = [2, 5, 9]
+              acc.push(btn)
+              if (groupEnd.includes(i))
+                acc.push(
+                  <span key={`d${i}`} className="md-toolbar-divider"></span>,
+                )
+              return acc
+            }, [])}
+        </div>
+      )}
       <div className="code-edit" ref={hostRef}></div>
       {outlineOpen && (
         <div className="outline-drawer">

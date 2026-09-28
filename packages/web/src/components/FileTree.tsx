@@ -14,7 +14,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
-import type { RepoNode } from '@any-draft/shared'
+import type { RepoNode, TrashEntry } from '@any-draft/shared'
 import { cn } from 'cn'
 import { Button } from './ui/button'
 import {
@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { TooltipHint } from '@/components/ui/tooltip'
+import TrashTree from './TrashTree'
 import {
   TreeIcon,
   TreeLabel,
@@ -44,6 +45,9 @@ export interface TreeBranch {
 interface Props {
   rootName: string
   tree: TreeBranch[]
+  trash: TrashEntry[]
+  trashNodes: Record<string, RepoNode[]>
+  activeTrashKey: string
   activePath: string
   onSelect: (path: string) => void
   onCreateMarkdown: (dirPath: string) => Promise<string | undefined>
@@ -54,6 +58,11 @@ interface Props {
   onSearch: () => void
   onRefresh: () => void
   onLocateImage: (name: string) => void
+  onOpenTrashMarkdown: (id: string, relativePath: string) => void
+  onRestoreTrash: (entry: TrashEntry) => void
+  onDeleteTrash: (entry: TrashEntry) => void
+  onEmptyTrash: () => void
+  onLoadTrashNodes: (id: string) => void
 }
 
 /** 下拉菜单触发按钮：hover/聚焦/菜单打开时显形 */
@@ -94,6 +103,9 @@ function nodeIcon(kind: RepoNode['kind']) {
 export default function FileTree({
   rootName,
   tree,
+  trash,
+  trashNodes,
+  activeTrashKey,
   activePath,
   onSelect,
   onCreateMarkdown,
@@ -104,6 +116,11 @@ export default function FileTree({
   onRefresh,
   onSearch,
   onLocateImage,
+  onOpenTrashMarkdown,
+  onRestoreTrash,
+  onDeleteTrash,
+  onEmptyTrash,
+  onLoadTrashNodes,
 }: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -186,8 +203,9 @@ export default function FileTree({
     const isMd = node.kind === 'markdown'
     const isRoot = node.path === ''
     const showNewActions = isDir
-    const showEditActions = (isDir && !isRoot) || (!isDir && isMd)
-    if (!showNewActions && !showEditActions) return null
+    const canRename = (isDir && !isRoot) || isMd
+    const canDelete = canRename || node.kind === 'image'
+    if (!showNewActions && !canDelete) return null
 
     return (
       <span className="flex-none">
@@ -222,17 +240,19 @@ export default function FileTree({
                 </DropdownMenuItem>
               </>
             )}
-            {showNewActions && showEditActions && <DropdownMenuSeparator />}
-            {showEditActions && (
+            {showNewActions && canDelete && <DropdownMenuSeparator />}
+            {canDelete && (
               <>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setRenamingPath(node.path)
-                    setRenameValue(node.name)
-                  }}
-                >
-                  <Pencil size={14} /> 重命名
-                </DropdownMenuItem>
+                {canRename && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setRenamingPath(node.path)
+                      setRenameValue(node.name)
+                    }}
+                  >
+                    <Pencil size={14} /> 重命名
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => onDelete(node.path)}
@@ -383,10 +403,32 @@ export default function FileTree({
       >
         <TreeProvider
           expandedIds={expandedIds}
-          onExpandedChange={setExpandedIds}
+          onExpandedChange={(next) => {
+            for (const id of next) {
+              if (!expandedIds.includes(id) && id.startsWith('trash-entry:')) {
+                const entryId = id.slice('trash-entry:'.length)
+                if (
+                  trash.some(
+                    (entry) => entry.id === entryId && entry.kind === 'dir',
+                  )
+                )
+                  onLoadTrashNodes(entryId)
+              }
+            }
+            setExpandedIds(next)
+          }}
           selectable={false}
         >
           <TreeView className="p-0 overflow-hidden">
+            <TrashTree
+              entries={trash}
+              nodes={trashNodes}
+              activeKey={activeTrashKey}
+              onOpenMarkdown={onOpenTrashMarkdown}
+              onRestore={onRestoreTrash}
+              onDelete={onDeleteTrash}
+              onEmpty={onEmptyTrash}
+            />
             <TreeNode nodeId="" level={0} isLast>
               <TreeNodeTrigger>
                 <TreeIcon icon={<BookText size={16} />} />

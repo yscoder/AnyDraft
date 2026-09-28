@@ -10,6 +10,7 @@ import type {
   ContentRepository,
   RepoNode,
   RepoNodeKind,
+  TrashEntry,
 } from '@any-draft/shared'
 import { safeFileName } from '@/core/transfer/exchange'
 import { blobToDataUrl } from '@/core/image/images'
@@ -132,6 +133,9 @@ function isHiddenEntry(name: string): boolean {
 }
 
 export class FsaRepository implements ContentRepository {
+  private readonly writeQueues = new Map<string, Promise<void>>()
+  private trashQueue: Promise<void> = Promise.resolve()
+
   constructor(private readonly root: FileSystemDirectoryHandle) {}
 
   get rootName(): string {
@@ -163,19 +167,22 @@ export class FsaRepository implements ContentRepository {
     }
   }
 
+  private async entryExists(dir: FileSystemDirectoryHandle, name: string) {
+    return (
+      (await this.exists(dir, name, 'file')) ||
+      (await this.exists(dir, name, 'dir'))
+    )
+  }
+
   /** 重名自动加序号：`名` → `名 2` → `名 3`（保留扩展名） */
-  private async uniqueName(
-    dirPath: string,
-    desired: string,
-    kind: 'file' | 'dir',
-  ): Promise<string> {
+  private async uniqueName(dirPath: string, desired: string): Promise<string> {
     const dir = await this.dirHandle(dirPath)
     const dot = desired.lastIndexOf('.')
     const stem = dot > 0 ? desired.slice(0, dot) : desired
     const ext = dot > 0 ? desired.slice(dot) : ''
     let candidate = desired
     for (let i = 2; ; i++) {
-      if (!(await this.exists(dir, candidate, kind))) return candidate
+      if (!(await this.entryExists(dir, candidate))) return candidate
       candidate = `${stem} ${i}${ext}`
     }
   }
@@ -215,13 +222,25 @@ export class FsaRepository implements ContentRepository {
   }
 
   async writeTextFile(path: string, content: string): Promise<void> {
-    const { parent, name } = this.split(path)
-    const fh = await (
-      await this.dirHandle(parent)
-    ).getFileHandle(name, { create: true })
-    const writable = await fh.createWritable()
-    await writable.write(content)
-    await writable.close()
+    const previous = this.writeQueues.get(path) ?? Promise.resolve()
+    const next = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const { parent, name } = this.split(path)
+        const fh = await (
+          await this.dirHandle(parent)
+        ).getFileHandle(name, { create: true })
+        const writable = await fh.createWritable()
+        await writable.write(content)
+        await writable.close()
+      })
+    this.writeQueues.set(path, next)
+    void next
+      .finally(() => {
+        if (this.writeQueues.get(path) === next) this.writeQueues.delete(path)
+      })
+      .catch(() => {})
+    return next
   }
 
   async createTextFile(
@@ -229,22 +248,14 @@ export class FsaRepository implements ContentRepository {
     desiredName: string,
     content = '',
   ): Promise<string> {
-    const name = await this.uniqueName(
-      dirPath,
-      safeFileName(desiredName),
-      'file',
-    )
+    const name = await this.uniqueName(dirPath, safeFileName(desiredName))
     const path = joinPath(dirPath, name)
     await this.writeTextFile(path, content)
     return path
   }
 
   async createDirectory(dirPath: string, desiredName: string): Promise<string> {
-    const name = await this.uniqueName(
-      dirPath,
-      safeFileName(desiredName),
-      'dir',
-    )
+    const name = await this.uniqueName(dirPath, safeFileName(desiredName))
     await (
       await this.dirHandle(dirPath)
     ).getDirectoryHandle(name, { create: true })
@@ -318,9 +329,326 @@ export class FsaRepository implements ContentRepository {
     }
   }
 
-  async removeNode(path: string): Promise<void> {
+  private async trashRoot(
+    create: boolean,
+  ): Promise<FileSystemDirectoryHandle | null> {
+    try {
+      const app = await this.root.getDirectoryHandle('.anydraft', { create })
+      return await app.getDirectoryHandle('trash', { create })
+    } catch (error) {
+      if (
+        !create &&
+        error instanceof DOMException &&
+        error.name === 'NotFoundError'
+      )
+        return null
+      throw error
+    }
+  }
+
+  private async withTrashLock<T>(run: () => Promise<T>): Promise<T> {
+    const previous = this.trashQueue
+    let release!: () => void
+    this.trashQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await previous
+    try {
+      return await run()
+    } finally {
+      release()
+    }
+  }
+
+  private validTrashEntry(value: unknown, id: string): value is TrashEntry {
+    if (!value || typeof value !== 'object') return false
+    const info = value as Partial<TrashEntry>
+    return (
+      info.id === id &&
+      this.validUserPath(info.originalPath ?? '') &&
+      info.name === baseNamePath(info.originalPath ?? '') &&
+      ['dir', 'markdown', 'image', 'other'].includes(info.kind ?? '') &&
+      typeof info.deletedAt === 'number' &&
+      Number.isFinite(info.deletedAt)
+    )
+  }
+
+  private async writeTrashIndex(
+    trash: FileSystemDirectoryHandle,
+    entries: TrashEntry[],
+  ): Promise<void> {
+    const file = await trash.getFileHandle('index.json', { create: true })
+    const writable = await file.createWritable()
+    await writable.write(JSON.stringify({ version: 1, entries }))
+    await writable.close()
+  }
+
+  private async readTrashIndex(
+    trash: FileSystemDirectoryHandle,
+  ): Promise<TrashEntry[]> {
+    let entries: TrashEntry[] = []
+    try {
+      const file = await trash.getFileHandle('index.json')
+      const data = JSON.parse(await (await file.getFile()).text()) as {
+        version?: unknown
+        entries?: unknown
+      }
+      if (
+        !data ||
+        data.version !== 1 ||
+        !Array.isArray(data.entries) ||
+        data.entries.some(
+          (entry) => !this.validTrashEntry(entry, (entry as TrashEntry)?.id),
+        )
+      )
+        throw new Error('回收站索引已损坏')
+      entries = data.entries
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'NotFoundError'))
+        throw error
+    }
+    const active: TrashEntry[] = []
+    for (const entry of entries) {
+      try {
+        const dir = await trash.getDirectoryHandle(entry.id)
+        if (await this.entryExists(dir, 'item')) active.push(entry)
+      } catch {
+        /* 跳过已恢复或已删除的条目 */
+      }
+    }
+    if (active.length !== entries.length)
+      await this.writeTrashIndex(trash, active)
+    return active
+  }
+
+  private async trashEntry(id: string): Promise<{
+    dir: FileSystemDirectoryHandle
+    info: TrashEntry
+    entries: TrashEntry[]
+    trash: FileSystemDirectoryHandle
+  }> {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('无效的回收站条目')
+    const trash = await this.trashRoot(false)
+    if (!trash) throw new Error('回收站条目不存在')
+    const entries = await this.readTrashIndex(trash)
+    const info = entries.find((entry) => entry.id === id)
+    if (!info) throw new Error('回收站条目不存在')
+    const dir = await trash.getDirectoryHandle(id)
+    return { dir, info, entries, trash }
+  }
+
+  private validUserPath(path: string): boolean {
+    return (
+      Boolean(path) &&
+      path
+        .split('/')
+        .every(
+          (part) =>
+            part && part !== '.' && part !== '..' && !part.startsWith('.'),
+        )
+    )
+  }
+
+  async trashNode(path: string): Promise<void> {
+    return this.withTrashLock(() => this.trashNodeUnlocked(path))
+  }
+
+  private async trashNodeUnlocked(path: string): Promise<void> {
+    if (!this.validUserPath(path)) throw new Error('不能删除应用数据目录')
+    await Promise.all(
+      [...this.writeQueues.entries()]
+        .filter(
+          ([written]) => written === path || written.startsWith(`${path}/`),
+        )
+        .map(([, pending]) => pending),
+    )
     const { parent, name } = this.split(path)
-    await (await this.dirHandle(parent)).removeEntry(name, { recursive: true })
+    const sourceParent = await this.dirHandle(parent)
+    let kind: RepoNodeKind = 'dir'
+    let sourceFile: FileSystemFileHandle | null = null
+    try {
+      sourceFile = await sourceParent.getFileHandle(name)
+      kind = classifyFile(name)
+    } catch {
+      await sourceParent.getDirectoryHandle(name)
+    }
+    const trash = await this.trashRoot(true)
+    if (!trash) throw new Error('无法创建回收站')
+    const entries = await this.readTrashIndex(trash)
+    const id = crypto.randomUUID()
+    const dir = await trash.getDirectoryHandle(id, { create: true })
+    if (sourceFile) {
+      const target = await dir.getFileHandle('item', { create: true })
+      const writable = await target.createWritable()
+      await writable.write(await sourceFile.getFile())
+      await writable.close()
+    } else {
+      await this.copyDir(
+        await sourceParent.getDirectoryHandle(name),
+        await dir.getDirectoryHandle('item', { create: true }),
+      )
+    }
+    const info: TrashEntry = {
+      id,
+      originalPath: path,
+      name,
+      kind,
+      deletedAt: Date.now(),
+    }
+    await this.writeTrashIndex(trash, [...entries, info])
+    await sourceParent.removeEntry(name, { recursive: true })
+  }
+
+  async listTrash(): Promise<TrashEntry[]> {
+    return this.withTrashLock(async () => {
+      const trash = await this.trashRoot(false)
+      if (!trash) return []
+      return (await this.readTrashIndex(trash)).sort(
+        (a, b) => b.deletedAt - a.deletedAt,
+      )
+    })
+  }
+
+  async listTrashNodes(id: string): Promise<RepoNode[]> {
+    return this.withTrashLock(() => this.listTrashNodesUnlocked(id))
+  }
+
+  private async listTrashNodesUnlocked(id: string): Promise<RepoNode[]> {
+    const { dir, info } = await this.trashEntry(id)
+    if (info.kind !== 'dir') return []
+    const nodes: RepoNode[] = []
+    const walk = async (folder: FileSystemDirectoryHandle, prefix: string) => {
+      for await (const [name, handle] of (
+        folder as DirectoryEntries
+      ).entries()) {
+        if (isHiddenEntry(name)) continue
+        const path = joinPath(prefix, name)
+        if (handle.kind === 'directory') {
+          nodes.push({ kind: 'dir', name, path })
+          await walk(handle as FileSystemDirectoryHandle, path)
+        } else {
+          const file = await (handle as FileSystemFileHandle).getFile()
+          nodes.push({
+            kind: classifyFile(name),
+            name,
+            path,
+            updatedAt: file.lastModified,
+            size: file.size,
+          })
+        }
+      }
+    }
+    await walk(await dir.getDirectoryHandle('item'), '')
+    return nodes
+  }
+
+  async readTrashText(id: string, relativePath = ''): Promise<string> {
+    return this.withTrashLock(() =>
+      this.readTrashTextUnlocked(id, relativePath),
+    )
+  }
+
+  private async readTrashTextUnlocked(
+    id: string,
+    relativePath: string,
+  ): Promise<string> {
+    const { dir, info } = await this.trashEntry(id)
+    if (info.kind !== 'dir' && (relativePath || info.kind !== 'markdown'))
+      throw new Error('不是 Markdown 文档')
+    if (info.kind === 'dir' && !MARKDOWN_EXT.test(relativePath))
+      throw new Error('不是 Markdown 文档')
+    if (relativePath && !this.validUserPath(relativePath))
+      throw new Error('无效的回收站路径')
+    const parent =
+      info.kind === 'dir' ? await dir.getDirectoryHandle('item') : dir
+    const fullPath = info.kind === 'dir' ? relativePath : 'item'
+    const folder =
+      info.kind === 'dir'
+        ? await this.dirWithin(parent, dirnamePath(fullPath))
+        : parent
+    return (
+      await (await folder.getFileHandle(baseNamePath(fullPath))).getFile()
+    ).text()
+  }
+
+  async trashImageUrl(id: string, relativePath: string): Promise<string> {
+    return this.withTrashLock(() =>
+      this.trashImageUrlUnlocked(id, relativePath),
+    )
+  }
+
+  private async trashImageUrlUnlocked(
+    id: string,
+    relativePath: string,
+  ): Promise<string> {
+    const { dir, info } = await this.trashEntry(id)
+    if (
+      info.kind !== 'dir' ||
+      !this.validUserPath(relativePath) ||
+      !IMAGE_EXT.test(relativePath)
+    )
+      throw new Error('不是回收站图片')
+    const root = await dir.getDirectoryHandle('item')
+    const folder = await this.dirWithin(root, dirnamePath(relativePath))
+    return URL.createObjectURL(
+      await (await folder.getFileHandle(baseNamePath(relativePath))).getFile(),
+    )
+  }
+
+  private async dirWithin(
+    root: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<FileSystemDirectoryHandle> {
+    let folder = root
+    for (const part of path.split('/').filter(Boolean))
+      folder = await folder.getDirectoryHandle(part)
+    return folder
+  }
+
+  async restoreTrash(id: string): Promise<string> {
+    return this.withTrashLock(() => this.restoreTrashUnlocked(id))
+  }
+
+  private async restoreTrashUnlocked(id: string): Promise<string> {
+    const { dir, info, entries, trash } = await this.trashEntry(id)
+    let parent = this.root
+    for (const part of dirnamePath(info.originalPath)
+      .split('/')
+      .filter(Boolean))
+      parent = await parent.getDirectoryHandle(part, { create: true })
+    const name = await this.uniqueName(
+      dirnamePath(info.originalPath),
+      info.name,
+    )
+    if (info.kind === 'dir') {
+      await this.copyDir(
+        await dir.getDirectoryHandle('item'),
+        await parent.getDirectoryHandle(name, { create: true }),
+      )
+    } else {
+      const source = await dir.getFileHandle('item')
+      const target = await parent.getFileHandle(name, { create: true })
+      const writable = await target.createWritable()
+      await writable.write(await source.getFile())
+      await writable.close()
+    }
+    await trash.removeEntry(id, { recursive: true })
+    await this.writeTrashIndex(
+      trash,
+      entries.filter((entry) => entry.id !== id),
+    )
+    return joinPath(dirnamePath(info.originalPath), name)
+  }
+
+  async removeTrash(id: string): Promise<void> {
+    return this.withTrashLock(async () => {
+      const { entries, trash } = await this.trashEntry(id)
+      await trash.removeEntry(id, { recursive: true })
+      await this.writeTrashIndex(
+        trash,
+        entries.filter((entry) => entry.id !== id),
+      )
+    })
   }
 
   async createImageFile(
@@ -333,7 +661,7 @@ export class FsaRepository implements ContentRepository {
       const ext = blob.type.split('/')[1] || 'png'
       clean = `${clean}.${ext}`
     }
-    const name = await this.uniqueName(dirPath, clean, 'file')
+    const name = await this.uniqueName(dirPath, clean)
     const fh = await (
       await this.dirHandle(dirPath)
     ).getFileHandle(name, { create: true })

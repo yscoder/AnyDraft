@@ -21,6 +21,14 @@ export interface RepoNode {
   size?: number
 }
 
+export interface TrashEntry {
+  id: string
+  originalPath: string
+  name: string
+  kind: RepoNodeKind
+  deletedAt: number
+}
+
 export interface ContentRepository {
   /** 根目录显示名（如用户选择的文件夹名） */
   readonly rootName: string
@@ -44,7 +52,18 @@ export interface ContentRepository {
   /** 重命名（保留 Markdown 扩展名）；目标已存在时抛错。返回新路径 */
   renameNode(path: string, newName: string): Promise<string>
 
-  removeNode(path: string): Promise<void>
+  /** 移到工作目录内的 .anydraft/trash，保留原路径和删除时间 */
+  trashNode(path: string): Promise<void>
+  listTrash(): Promise<TrashEntry[]>
+  /** 回收站条目内部的节点，路径相对于被删除条目；目录条目不含根节点 */
+  listTrashNodes(id: string): Promise<RepoNode[]>
+  readTrashText(id: string, relativePath?: string): Promise<string>
+  /** 回收站文件夹内的图片 URL，用于只读预览 */
+  trashImageUrl(id: string, relativePath: string): Promise<string>
+  /** 恢复到原位置；重名时自动加序号，返回最终路径 */
+  restoreTrash(id: string): Promise<string>
+  /** 从回收站永久删除 */
+  removeTrash(id: string): Promise<void>
 
   /** 保存图片文件（重名自动加序号），返回最终路径 */
   createImageFile(

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ContentRepository, RepoNode } from '@any-draft/shared'
+import type { ContentRepository, RepoNode, TrashEntry } from '@any-draft/shared'
 
 function mimeFromPath(path: string): string {
   const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
@@ -96,11 +96,57 @@ export class TauriRepository implements ContentRepository {
     })
   }
 
-  removeNode(path: string): Promise<void> {
-    return invoke('remove_node', {
+  async trashNode(path: string): Promise<void> {
+    await Promise.all(
+      [...this.writeQueues.entries()]
+        .filter(
+          ([written]) => written === path || written.startsWith(`${path}/`),
+        )
+        .map(([, pending]) => pending),
+    )
+    return invoke('trash_node', {
       path,
+      id: crypto.randomUUID(),
       workspaceToken: this.workspaceToken,
     })
+  }
+
+  listTrash(): Promise<TrashEntry[]> {
+    return invoke('list_trash', { workspaceToken: this.workspaceToken })
+  }
+
+  listTrashNodes(id: string): Promise<RepoNode[]> {
+    return invoke('list_trash_nodes', {
+      id,
+      workspaceToken: this.workspaceToken,
+    })
+  }
+
+  readTrashText(id: string, relativePath = ''): Promise<string> {
+    return invoke('read_trash_text', {
+      id,
+      relativePath,
+      workspaceToken: this.workspaceToken,
+    })
+  }
+
+  async trashImageUrl(id: string, relativePath: string): Promise<string> {
+    const response = await invoke<ArrayBuffer>('read_trash_image_bytes', {
+      id,
+      relativePath,
+      workspaceToken: this.workspaceToken,
+    })
+    return URL.createObjectURL(
+      new Blob([response], { type: mimeFromPath(relativePath) }),
+    )
+  }
+
+  restoreTrash(id: string): Promise<string> {
+    return invoke('restore_trash', { id, workspaceToken: this.workspaceToken })
+  }
+
+  removeTrash(id: string): Promise<void> {
+    return invoke('remove_trash', { id, workspaceToken: this.workspaceToken })
   }
 
   async createImageFile(
