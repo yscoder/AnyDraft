@@ -3,6 +3,7 @@ import { Brand } from '@/components/Brand'
 import EditorPane from '@/components/EditorPane'
 import FileTree, { type TreeBranch } from '@/components/FileTree'
 import PreviewPane from '@/components/PreviewPane'
+import SidebarLinks from '@/components/SidebarLinks'
 import ThemeControls from '@/components/ThemeControls'
 import Toolbar from '@/components/Toolbar'
 import {
@@ -1002,6 +1003,7 @@ export default function App() {
             onLocateImage={handleLocateImage}
           />
         </SidebarContent>
+        <SidebarLinks />
         <SidebarRail />
       </Sidebar>
 
