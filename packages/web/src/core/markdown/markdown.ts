@@ -9,6 +9,8 @@ import MarkdownIt from 'markdown-it'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItMark from 'markdown-it-mark'
 import type { HLJSApi } from 'highlight.js'
+import { CODE_PALETTE } from '@/core/theme/highlight'
+import { MONO } from '@/core/theme/fonts'
 import {
   applyDensity,
   getTheme,
@@ -387,7 +389,7 @@ md.renderer.rules.blockquote_open = ((tokens, idx, _o, env) => {
 md.renderer.rules.blockquote_close = (() => '</blockquote>') as RenderRule
 
 /** 把 hljs 输出的 <span class="hljs-xxx"> 转成内联 color（微信粘贴无损），
- *  非高亮标签保留原文。palette: theme.codePalette（token class → 颜色） */
+ *  非高亮标签保留原文。palette: CODE_PALETTE（token class → 颜色） */
 function inlineHighlight(
   html: string,
   palette: Record<string, string>,
@@ -487,14 +489,12 @@ const renderCode: RenderRule = (tokens, idx, _o, env) => {
   const lang = (tokens[idx].info || '').trim().split(/\s+/)[0]
   const highlighted = highlightCached(raw, lang)
   const inner =
-    highlighted !== null
-      ? inlineHighlight(highlighted, env.theme.codePalette)
-      : esc(raw)
+    highlighted !== null ? inlineHighlight(highlighted, CODE_PALETTE) : esc(raw)
   const line = tokens[idx].map?.[0]
   // 每行的 style 都一样，提到循环外算一次（长代码块能省掉成百次字符串拼接）
   const lineStyle = st({
     display: 'block',
-    'font-family': env.theme.mono,
+    'font-family': MONO,
     'font-size': c.fontSize,
     'line-height': c.lineHeight,
     color: 'inherit',
@@ -511,7 +511,7 @@ const renderCode: RenderRule = (tokens, idx, _o, env) => {
     padding: c.padding,
     'overflow-x': 'auto',
     margin: `0 0 ${env.theme.pMargin}`,
-    'font-family': env.theme.mono,
+    'font-family': MONO,
     'font-size': c.fontSize,
     'line-height': c.lineHeight,
     ...(c.extra ?? {}),
@@ -573,7 +573,7 @@ md.renderer.rules.code_inline = ((tokens, idx, _o, env) => {
     color: c.color,
     'border-radius': c.borderRadius,
     padding: c.padding,
-    'font-family': env.theme.mono,
+    'font-family': MONO,
     'font-size': c.fontSize,
     ...(c.extra ?? {}),
   })}">${esc(tokens[idx].content)}</code>`
