@@ -13,7 +13,7 @@
 packages/
 ├── shared/    @any-draft/shared   领域类型、仓储接口与 ZIP 编解码
 ├── web/       @any-draft/web      Web 应用、编辑器、渲染与浏览器存储适配器
-└── desktop/   @any-draft/desktop  Tauri 桌面端占位包，尚未实现
+└── desktop/   @any-draft/desktop  Tauri 2 桌面运行时与原生文件系统实现
 ```
 
 ## 用户界面设计

@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Pencil,
   RefreshCw,
+  Search,
   Trash2,
 } from 'lucide-react'
 import type { RepoNode } from '@any-draft/shared'
@@ -50,6 +51,7 @@ interface Props {
   onRename: (path: string, newName: string) => Promise<string | undefined>
   onDelete: (path: string) => void
   onChangeRoot: () => void
+  onSearch: () => void
   onRefresh: () => void
   onLocateImage: (name: string) => void
 }
@@ -100,6 +102,7 @@ export default function FileTree({
   onDelete,
   onChangeRoot,
   onRefresh,
+  onSearch,
   onLocateImage,
 }: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
@@ -337,6 +340,17 @@ export default function FileTree({
           文稿
         </span>
         <div className="flex items-center gap-0.5">
+          <TooltipHint content="刷新目录">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="rounded-sm!"
+              aria-label="刷新目录"
+              onClick={onRefresh}
+            >
+              <RefreshCw />
+            </Button>
+          </TooltipHint>
           <TooltipHint content="更换目录">
             <Button
               variant="ghost"
@@ -348,15 +362,15 @@ export default function FileTree({
               <FolderCog />
             </Button>
           </TooltipHint>
-          <TooltipHint content="刷新目录">
+          <TooltipHint content="搜索">
             <Button
               variant="ghost"
               size="icon-sm"
               className="rounded-sm!"
-              aria-label="刷新目录"
-              onClick={onRefresh}
+              aria-label="搜索"
+              onClick={onSearch}
             >
-              <RefreshCw />
+              <Search />
             </Button>
           </TooltipHint>
         </div>

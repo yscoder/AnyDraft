@@ -61,7 +61,13 @@ interface Props {
    * 外部跳转请求（文件树点击图片时定位到引用处）。
    * nonce 用来区分「同一行被再次请求」，否则重复点同一张图不会触发 effect。
    */
-  jumpRequest: { line: number; nonce: number } | null
+  jumpRequest: {
+    line: number
+    nonce: number
+    from?: number
+    to?: number
+    path?: string
+  } | null
 }
 
 const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
@@ -278,16 +284,23 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   // 外部跳转：定位到指定行并居中。
   // 声明顺序在内容同步之后 —— 跨草稿跳转时新文档已经就位，行号才对得上。
   useEffect(() => {
-    if (!jumpRequest) return
+    if (!jumpRequest || (jumpRequest.path && jumpRequest.path !== fileKey))
+      return
     const view = viewRef.current
     if (!view) return
     const lineNo = Math.min(
       Math.max(1, jumpRequest.line + 1),
       view.state.doc.lines,
     )
-    const pos = view.state.doc.line(lineNo).from
+    const pos = Math.min(
+      jumpRequest.from ?? view.state.doc.line(lineNo).from,
+      view.state.doc.length,
+    )
     view.dispatch({
-      selection: { anchor: pos },
+      selection: {
+        anchor: pos,
+        head: Math.min(jumpRequest.to ?? pos, view.state.doc.length),
+      },
       effects: EditorView.scrollIntoView(pos, { y: 'center' }),
     })
     view.focus()

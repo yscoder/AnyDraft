@@ -2,6 +2,8 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Brand } from '@/components/Brand'
 import EditorPane from '@/components/EditorPane'
 import FileTree, { type TreeBranch } from '@/components/FileTree'
+import SearchDialog from '@/features/search/SearchDialog'
+import { findMatches, type SearchMatch } from '@/features/search/search'
 import PreviewPane from '@/components/PreviewPane'
 import SidebarLinks from '@/components/SidebarLinks'
 import ThemeControls from '@/components/ThemeControls'
@@ -104,6 +106,7 @@ export default function App() {
   const [repoError, setRepoError] = useState('')
   const [rootName, setRootName] = useState('')
 
+  const [searchOpen, setSearchOpen] = useState(false)
   const [nodes, setNodes] = useState<RepoNode[]>([])
   const [contents, setContents] = useState<Record<string, string>>({})
   const [activePath, setActivePath] = useState('')
@@ -377,6 +380,7 @@ export default function App() {
 
   const openRepo = async (repo: ContentRepository): Promise<void> => {
     documentLoadRef.current += 1
+    setSearchOpen(false)
     repoRef.current = repo
     setRootName(repo.rootName || '浏览器内置存储')
     activePathRef.current = ''
@@ -705,9 +709,66 @@ export default function App() {
 
   const [jumpRequest, setJumpRequest] = useState<{
     line: number
+    from?: number
+    to?: number
+    path?: string
     nonce: number
   } | null>(null)
   const jumpNonce = useRef(0)
+  const searchOverlays = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(contents).filter(
+          ([path, text]) => text !== diskContentsRef.current[path],
+        ),
+      ),
+    [contents, saved],
+  )
+
+  const openSearchResult = async (
+    path: string,
+    query: string,
+    match?: SearchMatch,
+  ): Promise<boolean> => {
+    const repo = repoRef.current
+    if (!repo) return false
+    const request = ++documentLoadRef.current
+    const overlay = searchOverlays[path]
+    const content = overlay ?? (await repo.readTextFile(path))
+    if (repo !== repoRef.current || request !== documentLoadRef.current)
+      return false
+    if (overlay === undefined) diskContentsRef.current[path] = content
+    setContents((previous) => ({ ...previous, [path]: content }))
+    activePathRef.current = path
+    setActivePath(path)
+    setJumpRequest(null)
+    if (match) {
+      setViewMode('split')
+      const matches = findMatches(content, query)
+      const target =
+        matches.find((item) => item.from === match.from) ??
+        matches.reduce<SearchMatch | undefined>(
+          (best, item) =>
+            !best ||
+            Math.abs(item.from - match.from) < Math.abs(best.from - match.from)
+              ? item
+              : best,
+          undefined,
+        )
+      if (!target) {
+        flash('该匹配已不存在，已打开最新文档', 'warning')
+        return true
+      }
+      setJumpRequest({
+        path,
+        line: target.line - 1,
+        from: target.from,
+        to: target.to,
+        nonce: ++jumpNonce.current,
+      })
+    }
+    return true
+  }
 
   const handleLocateImage = (name: string) => {
     if (!activePath) {
@@ -990,6 +1051,7 @@ export default function App() {
         </SidebarHeader>
         <SidebarContent className="overflow-hidden">
           <FileTree
+            onSearch={() => setSearchOpen(true)}
             rootName={rootName}
             tree={tree}
             activePath={activePath}
@@ -1157,6 +1219,16 @@ export default function App() {
           )}
         </section>
       </SidebarInset>
+      {searchOpen && repoRef.current && (
+        <SearchDialog
+          repo={repoRef.current}
+          onNodes={setNodes}
+          nodes={nodes}
+          overlays={searchOverlays}
+          onClose={() => setSearchOpen(false)}
+          onSelect={openSearchResult}
+        />
+      )}
       <AlertDialog
         open={Boolean(confirmation)}
         onOpenChange={(open) => !open && setConfirmation(null)}
