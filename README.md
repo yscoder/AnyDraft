@@ -157,6 +157,8 @@ React UI / CodeMirror / Markdown 渲染 / 导入导出
 
 ## 测试与质量检查
 
+UI 手动测试使用 [`tests/manual/`](./tests/manual/README.md) 中的固定文档，覆盖基础冒烟、Markdown 排版、长文滚动、搜索和本地图片预览。启动应用后，将该目录选为本地工作目录；使用浏览器内置存储时可导入其中的文档。具体步骤和检查点见目录说明，不需要另建临时 Markdown 文件。
+
 提交修改前建议依次运行：
 
 ```bash
