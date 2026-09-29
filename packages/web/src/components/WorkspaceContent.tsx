@@ -59,6 +59,7 @@ interface Props {
   setDensityId: (id: string) => void
   setDarkPreview: (value: boolean) => void
   exporting: boolean
+  copying: boolean
   handleCopy: ComponentProps<typeof Toolbar>['onCopy']
   handleImport: ComponentProps<typeof Toolbar>['onImport']
   handleExportMarkdown: ComponentProps<typeof Toolbar>['onExportMarkdown']
@@ -97,6 +98,7 @@ export default function WorkspaceContent({
   setDensityId,
   setDarkPreview,
   exporting,
+  copying,
   handleCopy,
   handleImport,
   handleExportMarkdown,
@@ -137,6 +139,7 @@ export default function WorkspaceContent({
             onExportBackup={() => void handleExportBackup()}
             onExportImage={() => void handleExportImage()}
             exporting={exporting}
+            copying={copying}
             hasActiveDraft={Boolean(activeDraft && !trashDocument)}
           />
         </div>

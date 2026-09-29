@@ -1,6 +1,6 @@
 import type { RepoNode } from '@any-draft/shared'
 import { baseNamePath, dirnamePath, joinPath } from '@/core/fs/fsa'
-import { collectImageRefs } from '@/core/markdown/markdown'
+import { collectImageSources } from '@/core/markdown/markdown'
 
 export interface ReferencedImage {
   name: string
@@ -29,6 +29,25 @@ function resolveRelativePath(dirPath: string, ref: string): string | null {
   return parts.join('/')
 }
 
+export function resolveImageReference(
+  markdownPath: string,
+  rawRef: string,
+  nodes: RepoNode[],
+): RepoNode | null {
+  const ref = decodeImageRef(rawRef)
+  const name = baseNamePath(ref)
+  if (!name) return null
+  const images = nodes.filter((node) => node.kind === 'image')
+  const currentDir = dirnamePath(markdownPath)
+  const exactPath = resolveRelativePath(currentDir, ref)
+  return (
+    (exactPath ? images.find((image) => image.path === exactPath) : null) ??
+    images.find((image) => image.path === joinPath(currentDir, name)) ??
+    images.find((image) => baseNamePath(image.path) === name) ??
+    null
+  )
+}
+
 /**
  * 找出当前 Markdown 实际引用的图片。
  *
@@ -40,20 +59,16 @@ export function findReferencedImages(
   markdown: string,
   nodes: RepoNode[],
 ): ReferencedImage[] {
-  const images = nodes.filter((node) => node.kind === 'image')
-  const currentDir = dirnamePath(markdownPath)
   const picked = new Map<string, RepoNode>()
 
-  for (const rawRef of collectImageRefs(markdown)) {
+  for (const rawRef of collectImageSources(markdown)) {
+    if (/^(?:https?:)?\/\//i.test(rawRef) || /^(?:data|blob):/i.test(rawRef))
+      continue
     const ref = decodeImageRef(rawRef)
     const name = baseNamePath(ref)
     if (!name || picked.has(name)) continue
 
-    const exactPath = resolveRelativePath(currentDir, ref)
-    const node =
-      (exactPath ? images.find((image) => image.path === exactPath) : null) ??
-      images.find((image) => image.path === joinPath(currentDir, name)) ??
-      images.find((image) => baseNamePath(image.path) === name)
+    const node = resolveImageReference(markdownPath, rawRef, nodes)
     if (node) picked.set(name, node)
   }
 

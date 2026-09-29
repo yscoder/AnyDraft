@@ -29,6 +29,7 @@ interface Props {
   onExportImage: () => void
   /** 导出进行中：禁用菜单，避免重复触发 */
   exporting: boolean
+  copying: boolean
   /** 是否已打开 Markdown；未打开时禁用内容相关操作 */
   hasActiveDraft: boolean
 }
@@ -40,6 +41,7 @@ export default function Toolbar({
   onExportBackup,
   onExportImage,
   exporting,
+  copying,
   hasActiveDraft,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -112,11 +114,13 @@ export default function Toolbar({
       <Button
         size="sm"
         onClick={onCopy}
-        aria-label="复制到公众号"
-        disabled={!hasActiveDraft}
+        aria-label={copying ? '检查中' : '复制到公众号'}
+        disabled={!hasActiveDraft || copying}
       >
         <Copy />
-        <span className="max-[700px]:hidden">复制到公众号</span>
+        <span className="max-[700px]:hidden">
+          {copying ? '检查中…' : '复制到公众号'}
+        </span>
       </Button>
     </div>
   )

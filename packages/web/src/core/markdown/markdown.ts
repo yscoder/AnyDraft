@@ -70,6 +70,7 @@ interface Token {
     title?: string
   } | null
   attrGet(name: string): string | null
+  children?: Token[] | null
 }
 
 interface Env {
@@ -701,6 +702,21 @@ export function collectImageRefs(markdown: string): Set<string> {
     i = paren.end + 1
   }
   return names
+}
+
+/** 按实际 Markdown 语法收集图片，忽略代码块和行内代码中的示例。 */
+export function collectImageSources(markdown: string): string[] {
+  const sources: string[] = []
+  const visit = (tokens: Token[]) => {
+    for (const token of tokens) {
+      if (token.type === 'image') sources.push(token.attrGet('src') ?? '')
+      if (token.type === 'obsidian_embed')
+        sources.push(token.meta?.name ?? token.content)
+      if (token.children) visit(token.children)
+    }
+  }
+  visit(md.parse(preprocess(markdown), {}))
+  return sources
 }
 
 /** 某一行是否引用了指定图片（定位用，与上面同一套口径） */

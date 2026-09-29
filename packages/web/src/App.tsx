@@ -4,6 +4,7 @@ import RepositoryGate from '@/components/RepositoryGate'
 import WorkspaceContent from '@/components/WorkspaceContent'
 import WorkspaceSidebar from '@/components/WorkspaceSidebar'
 import SearchDialog from '@/features/search/SearchDialog'
+import CopyCheckDialog from '@/features/transfer/CopyCheckDialog'
 import { findMatches, type SearchMatch } from '@/features/search/search'
 import { useDraftTransfer } from '@/features/transfer/useDraftTransfer'
 import { useArticlePreview } from '@/features/workspace/useArticlePreview'
@@ -292,6 +293,10 @@ export default function App() {
 
   const {
     exporting,
+    copying,
+    pendingCopy,
+    confirmCopy,
+    dismissCopy,
     handleCopy,
     handleExportMarkdown,
     handleExportBackup,
@@ -391,6 +396,7 @@ export default function App() {
         setDensityId={setDensityId}
         setDarkPreview={setDarkPreview}
         exporting={exporting}
+        copying={copying}
         handleCopy={() => void handleCopy()}
         handleImport={handleImport}
         handleExportMarkdown={() => void handleExportMarkdown()}
@@ -411,6 +417,13 @@ export default function App() {
         confirmation={confirmation}
         onClose={() => setConfirmation(null)}
       />
+      {pendingCopy && (
+        <CopyCheckDialog
+          warnings={pendingCopy.warnings}
+          onClose={dismissCopy}
+          onContinue={confirmCopy}
+        />
+      )}
     </SidebarProvider>
   )
 }

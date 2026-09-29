@@ -21,6 +21,7 @@ import {
   type ReferencedImage,
 } from '@/core/drafts/assets'
 import { dataUrlToBlob } from '@/core/fs/fsa'
+import { checkBeforeCopy, type CopyWarning } from './checkBeforeCopy'
 
 interface DraftTransferOptions {
   markdown: string
@@ -60,36 +61,70 @@ export function useDraftTransfer({
   flash,
 }: DraftTransferOptions) {
   const [exporting, setExporting] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [pendingCopy, setPendingCopy] = useState<{
+    html: string
+    warnings: CopyWarning[]
+  } | null>(null)
   /* ---------------- 复制 / 导出 ---------------- */
   /** 把当前正文引用的图片换成 data URL（公众号剪贴板不接受 blob URL） */
   const resolveImageDataUrls = async (
     md: string,
-  ): Promise<Record<string, string>> => {
+  ): Promise<{ dataUrls: Record<string, string>; unreadable: string[] }> => {
     const repo = repoRef.current
-    if (!repo || !activePath) return {}
+    if (!repo || !activePath) return { dataUrls: {}, unreadable: [] }
     const images = findReferencedImages(activePath, md, nodes)
-    const out: Record<string, string> = {}
+    const dataUrls: Record<string, string> = {}
+    const unreadable: string[] = []
     await Promise.all(
       images.map(async ({ name, node }) => {
         try {
-          out[name] = await repo.readImageAsDataUrl(node.path)
+          dataUrls[name] = await repo.readImageAsDataUrl(node.path)
         } catch {
-          /* 单张转换失败则跳过，正文退回占位提示 */
+          unreadable.push(name)
         }
       }),
     )
-    return out
+    return { dataUrls, unreadable }
   }
 
-  const handleCopy = async () => {
-    await ensureHighlighter()
-    const dataUrls = await resolveImageDataUrls(markdown)
-    const { html } = renderArticle(markdown, theme, dataUrls, density)
+  const copyPrepared = async (html: string) => {
     const ok = await copyRichText(html)
     flash(
       ok ? '已复制，去公众号 ⌘V 粘贴' : '复制失败，请用浏览器 Chrome/Edge',
       ok ? 'success' : 'error',
     )
+  }
+
+  const handleCopy = async () => {
+    if (copying || !activeDraft) return
+    setCopying(true)
+    try {
+      await ensureHighlighter()
+      const { dataUrls, unreadable } = await resolveImageDataUrls(markdown)
+      const { body, html } = renderArticle(markdown, theme, dataUrls, density)
+      const warnings = checkBeforeCopy(
+        markdown,
+        body,
+        activePath,
+        nodes,
+        unreadable,
+      )
+      if (warnings.length) setPendingCopy({ html, warnings })
+      else await copyPrepared(html)
+    } catch (err) {
+      console.warn('复制前检查失败', err)
+      flash('复制前检查失败，请重试', 'error')
+    } finally {
+      setCopying(false)
+    }
+  }
+
+  const confirmCopy = () => {
+    if (!pendingCopy) return
+    const { html } = pendingCopy
+    setPendingCopy(null)
+    void copyPrepared(html)
   }
 
   const handleExportMarkdown = async () => {
@@ -142,7 +177,7 @@ export function useDraftTransfer({
     setExporting(true)
     try {
       await ensureHighlighter()
-      const dataUrls = await resolveImageDataUrls(markdown)
+      const { dataUrls } = await resolveImageDataUrls(markdown)
       const { body } = renderArticle(markdown, theme, dataUrls, density)
       const blob = await renderLongImage({ body, theme, author: '稿域' })
       const runtime = runtimeRef.current
@@ -211,6 +246,10 @@ export function useDraftTransfer({
 
   return {
     exporting,
+    copying,
+    pendingCopy,
+    confirmCopy,
+    dismissCopy: () => setPendingCopy(null),
     handleCopy,
     handleExportMarkdown,
     handleExportBackup,
