@@ -20,6 +20,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { FileText, ListTree } from 'lucide-react'
+import { shortcutLabel } from '@/features/shortcuts/shortcuts'
 import type { Theme } from '@/core/theme/theme'
 import {
   parseArticle,
@@ -46,6 +47,8 @@ interface Props {
   activePath: string
   editorPanelRef: ComponentProps<typeof ResizablePanel>['panelRef']
   handleAddImage: ComponentProps<typeof EditorPane>['onAddImage']
+  onHelp: () => void
+  onViewMode: () => void
   availableImageNames: string[]
   scrollSync: ComponentProps<typeof EditorPane>['sync']
   jumpRequest: ComponentProps<typeof EditorPane>['jumpRequest']
@@ -88,6 +91,8 @@ export default function WorkspaceContent({
   activePath,
   editorPanelRef,
   handleAddImage,
+  onHelp,
+  onViewMode,
   availableImageNames,
   scrollSync,
   jumpRequest,
@@ -145,26 +150,30 @@ export default function WorkspaceContent({
       >
         <div className="workspace-panel-head">
           <div className="workspace-panel-head-left">
-            <SidebarTrigger className="rounded-md" />
+            <TooltipHint content={`切换侧栏 ${shortcutLabel('sidebar')}`}>
+              <SidebarTrigger className="rounded-md" />
+            </TooltipHint>
           </div>
-          <ToggleGroup
-            type="single"
-            value={viewMode}
-            variant="outline"
-            size="sm"
-            spacing={0}
-            aria-label="工作区模式"
-            onValueChange={(value) =>
-              value && setViewMode(value as 'split' | 'preview')
-            }
-          >
-            <ToggleGroupItem value="split" aria-label="对照模式">
-              对照
-            </ToggleGroupItem>
-            <ToggleGroupItem value="preview" aria-label="预览模式">
-              预览
-            </ToggleGroupItem>
-          </ToggleGroup>
+          <TooltipHint content={`对照 / 预览 ${shortcutLabel('viewMode')}`}>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              variant="outline"
+              size="sm"
+              spacing={0}
+              aria-label="工作区模式"
+              onValueChange={(value) =>
+                value && setViewMode(value as 'split' | 'preview')
+              }
+            >
+              <ToggleGroupItem value="split" aria-label="对照模式">
+                对照
+              </ToggleGroupItem>
+              <ToggleGroupItem value="preview" aria-label="预览模式">
+                预览
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </TooltipHint>
           <Toolbar
             onCopy={() => void handleCopy()}
             onImport={handleImport}
@@ -210,6 +219,8 @@ export default function WorkspaceContent({
                   setMarkdown(updateArticleBody(markdown, value))
                 }
                 readOnly={Boolean(trashDocument)}
+                onHelp={onHelp}
+                onViewMode={onViewMode}
                 onAddImage={handleAddImage}
                 imageNames={availableImageNames}
                 fileKey={

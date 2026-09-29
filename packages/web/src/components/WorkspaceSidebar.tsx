@@ -11,10 +11,12 @@ import {
 
 interface Props extends Omit<ComponentProps<typeof FileTree>, 'onSearch'> {
   onSearch: () => void
+  onHelp: () => void
 }
 
 export default function WorkspaceSidebar({
   onSearch,
+  onHelp,
   ...fileTreeProps
 }: Props) {
   return (
@@ -25,7 +27,7 @@ export default function WorkspaceSidebar({
       <SidebarContent className="overflow-hidden">
         <FileTree onSearch={onSearch} {...fileTreeProps} />
       </SidebarContent>
-      <SidebarLinks />
+      <SidebarLinks onHelp={onHelp} />
       <SidebarRail />
     </Sidebar>
   )

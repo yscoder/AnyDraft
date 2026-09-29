@@ -1,4 +1,6 @@
-import { Download } from 'lucide-react'
+import { Download, Keyboard } from 'lucide-react'
+import { Kbd } from '@/components/ui/kbd'
+import { shortcutLabel } from '@/features/shortcuts/shortcuts'
 import {
   SidebarFooter,
   SidebarMenu,
@@ -6,10 +8,23 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 
-export default function SidebarLinks() {
+interface Props {
+  onHelp: () => void
+}
+
+export default function SidebarLinks({ onHelp }: Props) {
   return (
     <SidebarFooter className="border-t border-border">
       <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="sm" onClick={onHelp}>
+            <Keyboard aria-hidden="true" />
+            <span>帮助</span>
+            <Kbd className="ml-auto" aria-hidden="true">
+              {shortcutLabel('help')}
+            </Kbd>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton asChild size="sm">
             <a

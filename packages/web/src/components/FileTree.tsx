@@ -22,9 +22,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
 import { TooltipHint } from '@/components/ui/tooltip'
+import {
+  isShortcutAvailable,
+  shortcutLabel,
+} from '@/features/shortcuts/shortcuts'
 import TrashTree from './TrashTree'
 import {
   TreeIcon,
@@ -64,6 +69,7 @@ interface Props {
   onDeleteTrash: (entry: TrashEntry) => void
   onEmptyTrash: () => void
   onLoadTrashNodes: (id: string) => void
+  createDocumentRequest: number
 }
 
 /** 下拉菜单触发按钮：hover/聚焦/菜单打开时显形 */
@@ -123,11 +129,13 @@ export default function FileTree({
   onDeleteTrash,
   onEmptyTrash,
   onLoadTrashNodes,
+  createDocumentRequest,
 }: Props) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [expandedIds, setExpandedIds] = useState<string[]>([''])
   const renameInputRef = useRef<HTMLInputElement>(null)
+  const lastCreateRequest = useRef(createDocumentRequest)
   const [now] = useState(() => Date.now())
 
   useEffect(() => {
@@ -200,6 +208,14 @@ export default function FileTree({
     setRenameValue(createdPath.slice(createdPath.lastIndexOf('/') + 1))
   }
 
+  useEffect(() => {
+    if (lastCreateRequest.current === createDocumentRequest) return
+    lastCreateRequest.current = createDocumentRequest
+    void beginCreate('', onCreateMarkdown)
+    // 只在快捷键请求递增时执行，避免普通重渲染重复新建。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createDocumentRequest])
+
   /** 节点操作下拉菜单 */
   const renderNodeMenu = (node: RepoNode, isDir: boolean) => {
     const isMd = node.kind === 'markdown'
@@ -232,6 +248,11 @@ export default function FileTree({
                   onSelect={() => void beginCreate(node.path, onCreateMarkdown)}
                 >
                   <FilePlus size={14} /> 新建文档
+                  {isRoot && isShortcutAvailable('newDocument') && (
+                    <DropdownMenuShortcut>
+                      {shortcutLabel('newDocument')}
+                    </DropdownMenuShortcut>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() =>
@@ -367,7 +388,9 @@ export default function FileTree({
           文稿
         </span>
         <div className="flex items-center gap-0.5">
-          <TooltipHint content="刷新目录">
+          <TooltipHint
+            content={`刷新目录${isShortcutAvailable('refresh') ? ` ${shortcutLabel('refresh')}` : ''}`}
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -378,7 +401,9 @@ export default function FileTree({
               <RefreshCw />
             </Button>
           </TooltipHint>
-          <TooltipHint content="更换目录">
+          <TooltipHint
+            content={`更换目录${isShortcutAvailable('openDirectory') ? ` ${shortcutLabel('openDirectory')}` : ''}`}
+          >
             <Button
               variant="ghost"
               size="icon-sm"
@@ -389,7 +414,7 @@ export default function FileTree({
               <FolderCog />
             </Button>
           </TooltipHint>
-          <TooltipHint content="搜索">
+          <TooltipHint content={`搜索工作区 ${shortcutLabel('search')}`}>
             <Button
               variant="ghost"
               size="icon-sm"

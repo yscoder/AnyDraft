@@ -4,6 +4,8 @@ import RepositoryGate from '@/components/RepositoryGate'
 import WorkspaceContent from '@/components/WorkspaceContent'
 import WorkspaceSidebar from '@/components/WorkspaceSidebar'
 import SearchDialog from '@/features/search/SearchDialog'
+import ShortcutsDialog from '@/features/shortcuts/ShortcutsDialog'
+import WorkspaceShortcuts from '@/features/shortcuts/WorkspaceShortcuts'
 import ImageCleanupDialog from '@/features/image-cleanup/ImageCleanupDialog'
 import CopyCheckDialog from '@/features/transfer/CopyCheckDialog'
 import { findMatches, type SearchMatch } from '@/features/search/search'
@@ -105,6 +107,8 @@ export default function App() {
   const isPreviewOnly = viewMode === 'preview'
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [cleanupOpen, setCleanupOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [createDocumentRequest, setCreateDocumentRequest] = useState(0)
   const [isNarrow, setIsNarrow] = useState(
     () => window.matchMedia('(max-width: 900px)').matches,
   )
@@ -341,8 +345,24 @@ export default function App() {
 
   return (
     <SidebarProvider className="h-full min-h-0">
+      <WorkspaceShortcuts
+        blocked={Boolean(
+          searchOpen || cleanupOpen || confirmation || pendingCopy,
+        )}
+        helpOpen={helpOpen}
+        onNewDocument={() => setCreateDocumentRequest((request) => request + 1)}
+        onOpenDirectory={() => void handlePickRoot()}
+        onRefresh={handleRefresh}
+        onSearch={() => setSearchOpen(true)}
+        onHelp={() => setHelpOpen((open) => !open)}
+        onViewMode={() =>
+          setViewMode((mode) => (mode === 'split' ? 'preview' : 'split'))
+        }
+      />
       <WorkspaceSidebar
         onSearch={() => setSearchOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+        createDocumentRequest={createDocumentRequest}
         rootName={rootName}
         tree={tree}
         trash={trashEntries}
@@ -381,6 +401,10 @@ export default function App() {
         activePath={activePath}
         editorPanelRef={editorPanelRef}
         handleAddImage={handleAddImage}
+        onHelp={() => setHelpOpen(true)}
+        onViewMode={() =>
+          setViewMode((mode) => (mode === 'split' ? 'preview' : 'split'))
+        }
         availableImageNames={availableImageNames}
         scrollSync={scrollSync}
         jumpRequest={jumpRequest}
@@ -436,6 +460,7 @@ export default function App() {
         confirmation={confirmation}
         onClose={() => setConfirmation(null)}
       />
+      <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
       {pendingCopy && (
         <CopyCheckDialog
           warnings={pendingCopy.warnings}

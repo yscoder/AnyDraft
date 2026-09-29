@@ -44,6 +44,7 @@ import { autocompletion } from '@codemirror/autocomplete'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { TooltipHint } from '@/components/ui/tooltip'
+import { codeMirrorKey, shortcutLabel } from '@/features/shortcuts/shortcuts'
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync'
 
 /* Lucide 图标统一尺寸；H1–H4 菜单项各用对应字号图标 */
@@ -67,6 +68,8 @@ interface Props {
   fileKey: string
   lineOffset: number
   readOnly?: boolean
+  onHelp: () => void
+  onViewMode: () => void
   /** 滚动同步通道：把编辑器顶部对应的源码位置发布给预览 */
   sync: ScrollSyncChannel
   /** 预览模式：面板收起 */
@@ -96,6 +99,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
     fileKey,
     lineOffset,
     readOnly = false,
+    onHelp,
+    onViewMode,
     sync,
     collapsed,
     outlineOpen,
@@ -110,6 +115,10 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   readOnlyRef.current = readOnly
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const onHelpRef = useRef(onHelp)
+  onHelpRef.current = onHelp
+  const onViewModeRef = useRef(onViewMode)
+  onViewModeRef.current = onViewMode
   const syncRef = useRef(sync)
   syncRef.current = sync
   const lineOffsetRef = useRef(lineOffset)
@@ -165,21 +174,37 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
           highlightActiveLineGutter(),
           history(),
           keymap.of([
+            {
+              key: codeMirrorKey('help'),
+              run: () => {
+                onHelpRef.current()
+                return true
+              },
+            },
+            {
+              key: codeMirrorKey('viewMode'),
+              run: () => {
+                onViewModeRef.current()
+                return true
+              },
+            },
             ...defaultKeymap,
             ...historyKeymap,
             ...searchKeymap,
             indentWithTab,
             // ⌘B 加粗 / ⌘I 斜体：选中包裹，未选中插入成对标记光标居中
             {
-              key: 'Mod-b',
+              key: codeMirrorKey('bold'),
               run: () => {
+                if (readOnlyRef.current) return false
                 wrapSelection('**', '**')
                 return true
               },
             },
             {
-              key: 'Mod-i',
+              key: codeMirrorKey('italic'),
               run: () => {
+                if (readOnlyRef.current) return false
                 wrapSelection('*', '*')
                 return true
               },
@@ -626,7 +651,10 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
           </div>
           {toolbarBtns
             .map((b) => (
-              <TooltipHint key={b.key} content={b.title}>
+              <TooltipHint
+                key={b.key}
+                content={`${b.title}${b.key === 'bold' || b.key === 'italic' ? ` ${shortcutLabel(b.key)}` : ''}`}
+              >
                 <button
                   className="md-toolbar-btn"
                   aria-label={b.title}
