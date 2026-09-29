@@ -15,6 +15,7 @@ import {
   Heading2,
   Heading3,
   Heading4,
+  ImagePlus,
   Italic,
   Link,
   List,
@@ -44,6 +45,10 @@ import { autocompletion } from '@codemirror/autocomplete'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { TooltipHint } from '@/components/ui/tooltip'
+import {
+  imageDestination,
+  imageReference,
+} from '@/core/markdown/imageReference'
 import { codeMirrorKey, shortcutLabel } from '@/features/shortcuts/shortcuts'
 import type { ScrollSyncChannel } from '@/core/editor/scrollSync'
 
@@ -61,8 +66,8 @@ interface Props {
   value: string
   onChange: (v: string) => void
   /** 保存一张图片到当前文档同级目录，返回最终文件名（失败返回 null） */
-  onAddImage: (file: File) => Promise<string | null>
-  /** 已导入图片名列表（![[ 自动补全用） */
+  onAddImage: (file: File, preserveOriginal?: boolean) => Promise<string | null>
+  /** 已导入图片名列表（标准 Markdown 图片路径补全用） */
   imageNames: string[]
   /** 当前文档路径：切换文档时强制同步 doc */
   fileKey: string
@@ -113,6 +118,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   const editable = useMemo(() => new Compartment(), [])
   const readOnlyRef = useRef(readOnly)
   readOnlyRef.current = readOnly
+  const fileKeyRef = useRef(fileKey)
+  fileKeyRef.current = fileKey
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
   const onHelpRef = useRef(onHelp)
@@ -131,28 +138,41 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   /** onAddImage 走 ref：CodeMirror 监听只在挂载时注册，闭包会停在首个文档 */
   const onAddImageRef = useRef(onAddImage)
   onAddImageRef.current = onAddImage
-  /** 逐张保存图片，成功后回填 ![[name]] 到光标处 */
-  const insertImages = async (files: File[]) => {
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageInsertPositionRef = useRef(0)
+  /** 逐张保存图片，成功后在光标处插入标准 Markdown 引用 */
+  const insertImages = async (
+    files: File[],
+    position?: number,
+    preserveOriginal = false,
+  ) => {
     if (readOnlyRef.current) return
     const view = viewRef.current
     if (!view) return
+    const targetFileKey = fileKeyRef.current
     const names: string[] = []
     for (const file of files) {
+      if (fileKeyRef.current !== targetFileKey) return
       try {
-        const name = await onAddImageRef.current(file)
+        const name = await onAddImageRef.current(file, preserveOriginal)
         if (name) names.push(name)
       } catch {
         // 单张失败不阻断其它图片
       }
     }
-    if (!names.length || !view) return
-    const block = names.map((n) => `![[${n}]]\n`).join('')
+    if (!names.length || fileKeyRef.current !== targetFileKey) return
+    const block = names.map((name) => `${imageReference(name)}\n`).join('')
+    const insertAt = Math.min(
+      position ?? view.state.selection.main.head,
+      view.state.doc.length,
+    )
     view.dispatch({
-      changes: { from: view.state.selection.main.head, insert: block },
+      changes: { from: insertAt, insert: block },
       selection: {
-        anchor: view.state.selection.main.head + block.length,
+        anchor: insertAt + block.length,
       },
     })
+    if (position !== undefined) view.focus()
   }
 
   // 初始化 CodeMirror 编辑器
@@ -215,18 +235,18 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             base: markdownLanguage,
             codeLanguages: languages,
           }),
-          // ![[ 图片名自动补全
+          // 标准 Markdown 图片目标自动补全
           autocompletion({
             override: [
               (ctx) => {
-                const before = ctx.matchBefore(/!\[\[[\w一-龥.-]*$/)
+                const before = ctx.matchBefore(/!\[[^\]\n]*\]\([^\n)]*$/)
                 if (!before) return null
                 return {
-                  from: before.from + 3,
+                  from: before.from + before.text.lastIndexOf('(') + 1,
                   options: imageNamesRef.current.map((name) => ({
                     label: name,
                     type: 'image',
-                    apply: `${name}]]`,
+                    apply: `${imageDestination(name)})`,
                   })),
                 }
               },
@@ -570,6 +590,17 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       onClick: () => prefixLine('- [ ] '),
     },
     {
+      key: 'image',
+      title: '图片',
+      icon: <ImagePlus size={ICON} />,
+      onClick: () => {
+        const view = viewRef.current
+        if (!view || readOnlyRef.current) return
+        imageInsertPositionRef.current = view.state.selection.main.head
+        imageInputRef.current?.click()
+      },
+    },
+    {
       key: 'fence',
       title: '代码块',
       icon: <FileCode2 size={ICON} />,
@@ -608,9 +639,25 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       aria-hidden={collapsed}
       inert={collapsed}
     >
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.avif"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file)
+            void insertImages([file], imageInsertPositionRef.current, true)
+        }}
+      />
       {/* Markdown 格式工具栏 */}
       {!readOnly && (
-        <div className="md-toolbar" role="toolbar" aria-label="Markdown 格式">
+        <div
+          className="md-toolbar overflow-x-auto"
+          role="toolbar"
+          aria-label="Markdown 格式"
+        >
           {/* 标题层级下拉 */}
           <div className="md-toolbar-dropdown" ref={headingWrapRef}>
             <TooltipHint content="标题（H1–H4）">
@@ -665,8 +712,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
               </TooltipHint>
             ))
             .reduce<React.ReactNode[]>((acc, btn, i) => {
-              // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 代码块|表格|链接|分割线 | 撤销
-              const groupEnd = [2, 5, 9]
+              // 逻辑分组：加粗|斜体|行内码 ｜ 引用|列表|待办 ｜ 图片|代码块|表格|链接|分割线 | 撤销
+              const groupEnd = [2, 5, 10]
               acc.push(btn)
               if (groupEnd.includes(i))
                 acc.push(

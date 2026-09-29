@@ -48,7 +48,7 @@ describe('未引用图片扫描', () => {
       { kind: 'image', path: 'sample.png' },
     ]
     const repo = repository(nodes, {
-      'a/article.md': '![[cover.png]]\n```md\n![[sample.png]]\n```',
+      'a/article.md': '![封面](cover.png)\n```md\n![](sample.png)\n```',
       'b/article.md': '![](cover.png)',
     })
     const progress = []
@@ -75,7 +75,7 @@ describe('未引用图片扫描', () => {
     ]
     const result = await scanUnusedImages(
       repository(nodes, { 'article.md': '' }),
-      { 'article.md': '![[cover.png]]' },
+      { 'article.md': '![封面](cover.png)' },
       () => {},
     )
     assert.deepEqual(

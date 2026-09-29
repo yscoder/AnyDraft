@@ -64,7 +64,7 @@ test('沿用状态栏的字数阈值', () => {
 
 test('缺失图片与读取失败会提示，代码块中的图片语法不参与检查或加载', () => {
   const markdown =
-    '```md\n![](example.png)\n```\n\n![](missing.png)\n\n![[found.png]]'
+    '```md\n![](example.png)\n```\n\n![](missing.png)\n\n![已有图片](found.png)'
   assert.deepEqual(
     check(markdown, ['found.png'])
       .filter((item) => item.category === '图片')

@@ -196,13 +196,17 @@ export default function App() {
     }, 500)
   }
 
-  /** 编辑器拖入/粘贴图片：降采样后写入当前文档同级文件夹 */
-  const handleAddImage = async (file: File): Promise<string | null> => {
+  /** 图片写入当前文档目录；文件选择保留原件，拖入/粘贴沿用降采样 */
+  const handleAddImage = async (
+    file: File,
+    preserveOriginal = false,
+  ): Promise<string | null> => {
     const repo = repoRef.current
     if (!repo || !activePath) return null
     try {
-      const dataUrl = await downscaleImage(file)
-      const blob = dataUrlToBlob(dataUrl)
+      const blob = preserveOriginal
+        ? file
+        : dataUrlToBlob(await downscaleImage(file))
       const path = await repo.createImageFile(
         dirnamePath(activePath),
         file.name,

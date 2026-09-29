@@ -9,6 +9,8 @@ const WEB = path.resolve(HERE, '../packages/web')
 
 let findReferencedImages
 let locateImage
+let imageReference
+let renderArticle
 
 before(async () => {
   const server = await createServer({
@@ -26,6 +28,12 @@ before(async () => {
     ;({ locateImage } = await server.ssrLoadModule(
       '/src/core/drafts/locate.ts',
     ))
+    ;({ imageReference } = await server.ssrLoadModule(
+      '/src/core/markdown/imageReference.ts',
+    ))
+    ;({ renderArticle } = await server.ssrLoadModule(
+      '/src/core/markdown/markdown.ts',
+    ))
   } finally {
     await server.close()
   }
@@ -42,7 +50,7 @@ describe('当前 Markdown 图片范围', () => {
   it('只返回当前文档引用的图片，并优先同目录与精确相对路径', () => {
     const images = findReferencedImages(
       'a/article.md',
-      '![[cover.png]]\n![](assets/detail.png)',
+      '![封面](cover.png)\n![](assets/detail.png)',
       nodes,
     )
 
@@ -56,7 +64,34 @@ describe('当前 Markdown 图片范围', () => {
   })
 
   it('图片定位不搜索其它 Markdown', () => {
-    assert.equal(locateImage('正文\n![[cover.png]]', 'cover.png'), 1)
+    assert.equal(locateImage('正文\n![封面](cover.png)', 'cover.png'), 1)
     assert.equal(locateImage('当前正文没有图片', 'cover.png'), null)
+  })
+
+  it('新图片引用采用标准语法，复杂文件名可被扫描和定位', () => {
+    const name = '中文 图 (1)[终].png'
+    const reference = imageReference(name)
+    assert.equal(
+      imageReference('image-dep.png'),
+      '![image-dep.png](image-dep.png)',
+    )
+    assert.match(reference, /^!\[.+\]\(.+%20.+%281%29%5B.+%5D\.png\)$/)
+    assert.deepEqual(
+      findReferencedImages('a/article.md', reference, [
+        { kind: 'image', name, path: `a/${name}` },
+      ]).map(({ node }) => node.path),
+      [`a/${name}`],
+    )
+    assert.equal(locateImage(`正文\n${reference}`, name), 1)
+    assert.match(
+      renderArticle(reference, undefined, {
+        [name]: 'data:image/png;base64,AA==',
+      }).body,
+      /<img src="data:image\/png;base64,AA=="/,
+    )
+    assert.deepEqual(
+      findReferencedImages('a/article.md', '![[cover.png]]', nodes),
+      [],
+    )
   })
 })

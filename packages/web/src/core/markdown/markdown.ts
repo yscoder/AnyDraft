@@ -66,7 +66,6 @@ interface Token {
   meta: {
     id?: number
     subId?: number
-    name?: string
     tip?: boolean
     title?: string
   } | null
@@ -76,7 +75,7 @@ interface Token {
 
 interface Env {
   theme: Theme
-  /** 本地图片注册表：文件名 → data URI（Obsidian ![[name]] 嵌入用） */
+  /** 本地图片注册表：文件名 → data URI */
   images?: Record<string, string>
   /** 渲染时标记当前是否处于脚注条目内（用于跳过插件的段落包裹） */
   footnote?: boolean
@@ -97,27 +96,6 @@ const md = new MarkdownIt({
 })
 md.use(markdownItFootnote)
 md.use(markdownItMark)
-
-/* Obsidian 图片嵌入：![[文件名]] → 本地注册表里的图片；未注册时渲染占位提示 */
-md.inline.ruler.before(
-  'image',
-  'obsidian_embed',
-  (state: any, silent: boolean) => {
-    const start = state.pos
-    if (state.src.charCodeAt(start) !== 0x21 /* ! */) return false
-    if (state.src.slice(start, start + 3) !== '![[') return false
-    const end = state.src.indexOf(']]', start + 3)
-    if (end < 0) return false
-    if (!silent) {
-      const name = state.src.slice(start + 3, end).trim()
-      const token = state.push('obsidian_embed', 'span', 0)
-      token.meta = { name }
-      token.content = name
-    }
-    state.pos = end + 2
-    return true
-  },
-)
 
 /**
  * 从 `(` 之后开始扫描，找到配对的 `)`，返回其中的内容。
@@ -152,7 +130,7 @@ function splitDestTitle(inner: string): { dest: string; title: string } {
  * 文件名带空格的原生图片语法：`![](Grok 4.6 评测.png)`。
  *
  * CommonMark 规定不加尖括号的链接目标不能含空格，markdown-it 会把整段当普通文字，
- * 图根本不会渲染 —— 但 Obsidian / Typora 里带空格的截图文件名非常常见。
+ * 图根本不会渲染 —— 但外部导入的文档可能直接使用带空格的文件名。
  * 这条规则只接管「标准语法必然失败」的情况（目标含空格且没写尖括号），
  * 其余一律放行给内置规则。
  */
@@ -164,7 +142,6 @@ md.inline.ruler.before(
     const start: number = state.pos
     if (src.charCodeAt(start) !== 0x21 /* ! */) return false
     if (src.charCodeAt(start + 1) !== 0x5b /* [ */) return false
-    if (src.charCodeAt(start + 2) === 0x5b /* [ */) return false // ![[ ]] 交给 obsidian_embed
     const labelEnd = src.indexOf(']', start + 2)
     if (labelEnd < 0) return false
     if (src.charCodeAt(labelEnd + 1) !== 0x28 /* ( */) return false
@@ -650,69 +627,12 @@ function lookupLocalImage(
   return null
 }
 
-/** 把本地路径归一化成图片库的键（解码 + 去目录） */
-function localImageKey(src: string): string {
-  let decoded = src
-  try {
-    decoded = decodeURIComponent(src)
-  } catch {
-    // 编码不合法就用原值
-  }
-  return decoded.split(/[\\/]/).pop() ?? decoded
-}
-
-/**
- * 收集正文里引用到的本地图片文件名（两种语法都算）。
- *
- * 图片库的「是否被引用」判断必须和渲染时的解析口径一致，
- * 否则用原生语法引用的图会被当成未引用、被一键清理误删。
- */
-export function collectImageRefs(markdown: string): Set<string> {
-  const names = new Set<string>()
-  // Obsidian 嵌入 ![[name]]
-  for (const m of markdown.matchAll(/!\[\[\s*([^\]\n]+?)\s*\]\]/g)) {
-    names.add(m[1])
-    names.add(localImageKey(m[1]))
-  }
-  // 原生语法 ![alt](src "title")：与渲染同一套扫描口径，含空格/括号的文件名也要认
-  let i = 0
-  while (i < markdown.length) {
-    const bang = markdown.indexOf('![', i)
-    if (bang < 0) break
-    if (markdown.charCodeAt(bang + 2) === 0x5b) {
-      i = bang + 2
-      continue
-    }
-    const labelEnd = markdown.indexOf(']', bang + 2)
-    if (labelEnd < 0) break
-    if (markdown.charCodeAt(labelEnd + 1) !== 0x28) {
-      i = labelEnd + 1
-      continue
-    }
-    const paren = scanParen(markdown, labelEnd + 1)
-    if (!paren) {
-      i = labelEnd + 1
-      continue
-    }
-    const raw = paren.inner.trim().replace(/^<|>$/g, '')
-    const { dest } = splitDestTitle(raw)
-    if (dest && !isAbsoluteUrl(dest)) {
-      names.add(dest)
-      names.add(localImageKey(dest))
-    }
-    i = paren.end + 1
-  }
-  return names
-}
-
 /** 按实际 Markdown 语法收集图片，忽略代码块和行内代码中的示例。 */
 export function collectImageSources(markdown: string): string[] {
   const sources: string[] = []
   const visit = (tokens: Token[]) => {
     for (const token of tokens) {
       if (token.type === 'image') sources.push(token.attrGet('src') ?? '')
-      if (token.type === 'obsidian_embed')
-        sources.push(token.meta?.name ?? token.content)
       if (token.children) visit(token.children)
     }
   }
@@ -728,10 +648,16 @@ export function collectImageSources(markdown: string): string[] {
 
 /** 某一行是否引用了指定图片（定位用，与上面同一套口径） */
 export function lineReferencesImage(line: string, name: string): boolean {
-  return collectImageRefs(line).has(name)
+  return collectImageSources(line).some((src) => {
+    try {
+      return decodeURIComponent(src).split(/[\\/]/).pop() === name
+    } catch {
+      return src.split(/[\\/]/).pop() === name
+    }
+  })
 }
 
-/** 图片未找到时的占位提示（原生语法与 ![[ ]] 共用） */
+/** 图片未找到时的占位提示 */
 function missingImage(name: string, th: Theme): string {
   return `<span style="${st({
     display: 'block',
@@ -773,7 +699,7 @@ function isInlineImage(tokens: Token[], idx: number): boolean {
   for (let i = 0; i < tokens.length; i++) {
     if (i === idx) continue
     const t = tokens[i]
-    if (t.type === 'image' || t.type === 'obsidian_embed') continue
+    if (t.type === 'image') continue
     if (t.type === 'softbreak' || t.type === 'hardbreak') continue
     if (t.type === 'text') {
       if (t.content.trim()) return true
@@ -793,7 +719,7 @@ md.renderer.rules.image = ((tokens, idx, _o, env) => {
   if (isAbsoluteUrl(rawSrc)) {
     return renderImg(rawSrc, alt, title, env.theme, inline)
   }
-  // 相对路径：先按文件名去本地图片库找，这样 ![](图.png) 与 ![[图.png]] 行为一致
+  // 相对路径：先按文件名去本地图片库找
   const local = lookupLocalImage(rawSrc, env.images)
   if (local) return renderImg(local, alt || rawSrc, title, env.theme, inline)
   if (!rawSrc) return ''
@@ -804,14 +730,6 @@ md.renderer.rules.image = ((tokens, idx, _o, env) => {
     // 保留原值
   }
   return missingImage(label, env.theme)
-}) as RenderRule
-
-md.renderer.rules.obsidian_embed = ((tokens, idx, _o, env) => {
-  const name = tokens[idx].meta?.name ?? tokens[idx].content ?? ''
-  const uri = env.images?.[name] ?? lookupLocalImage(name, env.images)
-  if (uri)
-    return renderImg(uri, name, null, env.theme, isInlineImage(tokens, idx))
-  return missingImage(name, env.theme)
 }) as RenderRule
 
 /* ---------------- 脚注 ---------------- */

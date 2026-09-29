@@ -119,7 +119,7 @@ describe('工作区快捷键', () => {
     assert.equal(codeMirrorKey('bold'), 'Mod-b')
     assert.equal(codeMirrorKey('help'), 'Mod-/')
     assert.equal(codeMirrorKey('viewMode'), 'Mod-]')
-    assert.equal(shortcutLabel('search', true), '⌘⇧F')
+    assert.equal(shortcutLabel('search', true), '⌘ ⇧ F')
     assert.deepEqual(shortcutKeys('search', false), ['Ctrl', 'Shift', 'F'])
   })
 })
