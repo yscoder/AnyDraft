@@ -6,6 +6,7 @@
  * 主题通过 markdown-it 的 env 传入，渲染时逐规则读取。
  */
 import MarkdownIt from 'markdown-it'
+import { parseArticle } from './frontmatter'
 import markdownItFootnote from 'markdown-it-footnote'
 import markdownItMark from 'markdown-it-mark'
 import type { HLJSApi } from 'highlight.js'
@@ -715,7 +716,13 @@ export function collectImageSources(markdown: string): string[] {
       if (token.children) visit(token.children)
     }
   }
-  visit(md.parse(preprocess(markdown), {}))
+  const article = parseArticle(markdown)
+  visit(
+    md.parse(
+      preprocess(article.error ? '' : markdown.slice(article.headerEnd)),
+      {},
+    ),
+  )
   return sources
 }
 
@@ -924,11 +931,16 @@ export function renderArticle(
   images?: Record<string, string>,
   density?: DensityScale,
 ): RenderResult {
+  const article = parseArticle(markdown)
+  const source = article.error
+    ? ''
+    : '\n'.repeat(markdown.slice(0, article.headerEnd).split('\n').length - 1) +
+      markdown.slice(article.headerEnd)
   const th = density
     ? applyDensity(theme ?? getTheme(), density)
     : (theme ?? getTheme())
   const body = colorTasks(
-    md.render(preprocess(markdown), { theme: th, images }),
+    md.render(preprocess(source), { theme: th, images }),
     th,
   )
   const html = `<section style="${st({

@@ -1,6 +1,7 @@
 import type { RepoNode } from '@any-draft/shared'
 import { resolveImageReference } from '@/core/drafts/assets'
 import { collectImageSources } from '@/core/markdown/markdown'
+import { parseArticle } from '@/core/markdown/frontmatter'
 
 export interface CopyWarning {
   category: '标题' | '字数' | '链接' | '图片' | '内容'
@@ -39,7 +40,7 @@ export function checkBeforeCopy(
       message: `正文有 ${headingCount} 个一级标题，建议只保留一个。`,
     })
 
-  const charCount = markdown.replace(/\s/g, '').length
+  const charCount = parseArticle(markdown).body.replace(/\s/g, '').length
   if (charCount >= 20000)
     warnings.push({
       category: '字数',

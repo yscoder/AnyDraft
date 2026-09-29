@@ -24,6 +24,8 @@ interface Options {
   theme: Theme
   /** 文章头署名，留空则不画作者行 */
   author?: string
+  title?: string
+  stripTitle?: boolean
 }
 
 /** 等正文里的图片全部解码完，否则量出来的高度是错的 */
@@ -43,12 +45,24 @@ async function waitForImages(root: HTMLElement): Promise<void> {
 
 /** 文章头（标题 + 作者行），风格跟预览里的文章头一致 */
 function headHtml(title: string, theme: Theme, author?: string): string {
+  const escapeHtml = (value: string) =>
+    value.replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[character]!,
+    )
   const dateText = new Date().toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
-  const meta = author ? `${author} · ${dateText}` : dateText
+  const meta = author ? `${escapeHtml(author)} · ${dateText}` : dateText
   return `<div style="${st({ 'margin-bottom': '20px' })}">
     <div style="${st({
       'font-family': theme.heading.font,
@@ -56,7 +70,7 @@ function headHtml(title: string, theme: Theme, author?: string): string {
       'font-weight': '700',
       'line-height': '1.4',
       color: theme.heading.color,
-    })}">${title}</div>
+    })}">${escapeHtml(title)}</div>
     <div style="${st({
       'margin-top': '10px',
       'font-size': '13px',
@@ -73,8 +87,10 @@ export async function renderLongImage({
   body,
   theme,
   author,
+  title: articleTitle,
+  stripTitle,
 }: Options): Promise<Blob> {
-  const title = extractTitle(body)
+  const title = articleTitle || extractTitle(body)
   const bg = theme.body.bg ?? '#ffffff'
 
   const stage = document.createElement('div')
@@ -94,7 +110,7 @@ export async function renderLongImage({
   })
   card.innerHTML =
     (title ? headHtml(title, theme, author) : '') +
-    (title ? stripFirstH1(body) : body)
+    (stripTitle || (!articleTitle && title) ? stripFirstH1(body) : body)
 
   stage.appendChild(card)
   document.body.appendChild(stage)

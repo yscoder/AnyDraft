@@ -11,6 +11,7 @@ import { findReferencedImages } from '@/core/drafts/assets'
 import { baseNamePath, dirnamePath, joinPath } from '@/core/fs/fsa'
 import { createRuntime } from '@/core/runtime/createRuntime'
 import { toast } from 'sonner'
+import { createArticleSource } from '@/core/markdown/frontmatter'
 
 export function useWorkspaceRepository() {
   /* ---------------- 工作目录（平台适配层） ---------------- */
@@ -463,7 +464,11 @@ export function useWorkspaceRepository() {
       const repo = repoRef.current
       if (!repo) return
       try {
-        const path = await repo.createTextFile(dirPath, '未命名.md')
+        const path = await repo.createTextFile(
+          dirPath,
+          '未命名.md',
+          createArticleSource(),
+        )
         await refreshRepo()
         await openMarkdown(path)
         createdPath = path

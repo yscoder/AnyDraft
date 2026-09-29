@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react'
 import EditorPane from '@/components/EditorPane'
+import ArticleHeader from '@/components/ArticleHeader'
 import PreviewPane from '@/components/PreviewPane'
 import ThemeControls from '@/components/ThemeControls'
 import Toolbar from '@/components/Toolbar'
@@ -20,6 +21,11 @@ import {
 } from '@/components/ui/empty'
 import { FileText, ListTree } from 'lucide-react'
 import type { Theme } from '@/core/theme/theme'
+import {
+  parseArticle,
+  updateArticleBody,
+  updateArticleField,
+} from '@/core/markdown/frontmatter'
 
 /** 编辑器侧最小宽度（拖拽时保留，预览因此可达 desktop 宽度） */
 const MIN_EDITOR_PX = 180
@@ -46,6 +52,9 @@ interface Props {
   outlineOpen: boolean
   setOutlineOpen: (update: (value: boolean) => boolean) => void
   body: string
+  articleTitle: string
+  articleAuthor: string
+  legacyTitle: boolean
   theme: Theme
   darkPreview: boolean
   charCount: number
@@ -85,6 +94,9 @@ export default function WorkspaceContent({
   outlineOpen,
   setOutlineOpen,
   body,
+  articleTitle,
+  articleAuthor,
+  legacyTitle,
   theme,
   darkPreview,
   charCount,
@@ -105,6 +117,27 @@ export default function WorkspaceContent({
   handleExportBackup,
   handleExportImage,
 }: Props) {
+  const article = parseArticle(markdown)
+  const headerJump =
+    jumpRequest &&
+    (jumpRequest.from !== undefined
+      ? jumpRequest.from < article.bodyStart
+      : jumpRequest.line < article.lineOffset)
+  const bodyJump =
+    jumpRequest && !headerJump
+      ? {
+          ...jumpRequest,
+          line: Math.max(0, jumpRequest.line - article.lineOffset),
+          from:
+            jumpRequest.from === undefined
+              ? undefined
+              : Math.max(0, jumpRequest.from - article.bodyStart),
+          to:
+            jumpRequest.to === undefined
+              ? undefined
+              : Math.max(0, jumpRequest.to - article.bodyStart),
+        }
+      : null
   return (
     <SidebarInset className="h-full min-w-0 p-2 overflow-hidden">
       <section
@@ -151,7 +184,7 @@ export default function WorkspaceContent({
           >
             <ResizablePanel
               id="editor"
-              className="min-w-0 min-h-0 overflow-hidden"
+              className="flex min-w-0 min-h-0 flex-col overflow-hidden"
               panelRef={editorPanelRef}
               collapsible
               collapsedSize={0}
@@ -160,8 +193,22 @@ export default function WorkspaceContent({
             >
               <EditorPane
                 key={trashDocument ? 'trash' : 'workspace'}
-                value={markdown}
-                onChange={setMarkdown}
+                articleHeader={
+                  <ArticleHeader
+                    article={article}
+                    readOnly={Boolean(trashDocument) || Boolean(article.error)}
+                    focusTitleNonce={
+                      headerJump ? jumpRequest?.nonce : undefined
+                    }
+                    onChange={(field, value) =>
+                      setMarkdown(updateArticleField(markdown, field, value))
+                    }
+                  />
+                }
+                value={article.body}
+                onChange={(value) =>
+                  setMarkdown(updateArticleBody(markdown, value))
+                }
                 readOnly={Boolean(trashDocument)}
                 onAddImage={handleAddImage}
                 imageNames={availableImageNames}
@@ -170,8 +217,9 @@ export default function WorkspaceContent({
                     ? `trash:${trashDocument.id}:${trashDocument.relativePath}`
                     : activePath
                 }
+                lineOffset={article.lineOffset}
                 sync={scrollSync}
-                jumpRequest={jumpRequest}
+                jumpRequest={bodyJump}
                 collapsed={isPreviewOnly}
                 outlineOpen={outlineOpen}
               />
@@ -195,6 +243,9 @@ export default function WorkspaceContent({
               <PreviewPane
                 darkPreview={darkPreview}
                 body={body}
+                articleTitle={articleTitle}
+                articleAuthor={articleAuthor}
+                legacyTitle={legacyTitle}
                 theme={theme}
                 resizeKey={`${viewMode}:${isNarrow ? 'vertical' : 'horizontal'}`}
                 sync={scrollSync}

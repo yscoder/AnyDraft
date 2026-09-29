@@ -6,6 +6,7 @@ import {
   renderArticle,
 } from '@/core/markdown/markdown'
 import { readStored, writeStored } from '@/core/storage'
+import { parseArticle } from '@/core/markdown/frontmatter'
 
 interface Options {
   markdown: string
@@ -24,6 +25,7 @@ export function useArticlePreview({ markdown, imageUrls }: Options) {
   const density = useMemo(() => getDensity(densityId), [densityId])
   const [hlReady, setHlReady] = useState(isHighlighterReady)
   const deferredMarkdown = useDeferredValue(markdown)
+  const article = useMemo(() => parseArticle(markdown), [markdown])
   const result = useMemo(
     () => renderArticle(deferredMarkdown, theme, imageUrls, density),
     // hlReady 只作为「重算一次」的信号，不参与渲染入参
@@ -31,8 +33,8 @@ export function useArticlePreview({ markdown, imageUrls }: Options) {
     [deferredMarkdown, theme, imageUrls, density, hlReady],
   )
   const charCount = useMemo(
-    () => markdown.replace(/\s/g, '').length,
-    [markdown],
+    () => article.body.replace(/\s/g, '').length,
+    [article.body],
   )
   const countLevel: 'normal' | 'warn' | 'over' =
     charCount >= 20000 ? 'over' : charCount >= 18000 ? 'warn' : 'normal'
@@ -66,6 +68,7 @@ export function useArticlePreview({ markdown, imageUrls }: Options) {
     theme,
     density,
     result,
+    article,
     charCount,
     countLevel,
     countClass,

@@ -7,7 +7,7 @@
 /* 左侧源码面板：尺寸由 shadcn ResizablePanel 管理 */
 .editor-side {
   width: 100%;
-  height: 100%;
+  flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;

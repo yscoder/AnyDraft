@@ -18,6 +18,9 @@ import type { Theme } from '@/core/theme/theme'
 interface Props {
   darkPreview: boolean
   body: string
+  articleTitle: string
+  articleAuthor: string
+  legacyTitle: boolean
   theme: Theme
   /**
    * Layout-change signal (editor width and mode switching both change it):
@@ -175,6 +178,9 @@ function buildAnchors(scroll: HTMLElement): Anchor[] {
  */
 export default function PreviewPane({
   body,
+  articleTitle,
+  articleAuthor,
+  legacyTitle,
   theme,
   resizeKey,
   sync,
@@ -191,11 +197,14 @@ export default function PreviewPane({
   /** What actually gets drawn */
   const layout = device === 'desktop' ? 'desktop' : 'phone'
   const fit = fitFor(device, stage.w, stage.h)
-  const title = useMemo(() => extractTitle(body), [body])
+  const title = useMemo(
+    () => articleTitle || extractTitle(body),
+    [articleTitle, body],
+  )
   /** Body used for the preview (duplicate h1 removed; exports still use the full body) */
   const previewBody = useMemo(
-    () => (title ? stripFirstH1(body) : body),
-    [body, title],
+    () => (legacyTitle || (!articleTitle && title) ? stripFirstH1(body) : body),
+    [body, articleTitle, legacyTitle, title],
   )
   /** Date in the article head (a new Date() on every render means nothing) */
   const today = useMemo(() => new Date(), [])
@@ -417,7 +426,7 @@ export default function PreviewPane({
               <div className="article-head">
                 <h1 className="head-title">{title || '未命名文章'}</h1>
                 <div className="meta">
-                  <span className="author">稿域</span>
+                  <span className="author">{articleAuthor || '稿域'}</span>
                   <span className="byline">
                     {today.getFullYear()} 年 {today.getMonth() + 1} 月{' '}
                     {today.getDate()} 日

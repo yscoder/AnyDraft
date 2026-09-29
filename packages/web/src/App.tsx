@@ -96,6 +96,7 @@ export default function App() {
     theme,
     density,
     result,
+    article,
     charCount,
     countLevel,
     countClass,
@@ -386,6 +387,9 @@ export default function App() {
         outlineOpen={outlineOpen}
         setOutlineOpen={setOutlineOpen}
         body={result.body}
+        articleTitle={article.title}
+        articleAuthor={article.author}
+        legacyTitle={article.legacyTitle}
         theme={theme}
         darkPreview={darkPreview}
         charCount={charCount}

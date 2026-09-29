@@ -22,6 +22,11 @@ import {
 } from '@/core/drafts/assets'
 import { dataUrlToBlob } from '@/core/fs/fsa'
 import { checkBeforeCopy, type CopyWarning } from './checkBeforeCopy'
+import { parseArticle } from '@/core/markdown/frontmatter'
+
+function escapeHeading(value: string): string {
+  return value.replace(/[\\`*_{}\[\]()#+.!>|-]/g, '\\$&').replace(/\r?\n/g, ' ')
+}
 
 interface DraftTransferOptions {
   markdown: string
@@ -102,7 +107,11 @@ export function useDraftTransfer({
     try {
       await ensureHighlighter()
       const { dataUrls, unreadable } = await resolveImageDataUrls(markdown)
-      const { body, html } = renderArticle(markdown, theme, dataUrls, density)
+      const article = parseArticle(markdown)
+      const copySource = article.title
+        ? `# ${escapeHeading(article.title)}\n\n${article.body}`
+        : markdown
+      const { body, html } = renderArticle(copySource, theme, dataUrls, density)
       const warnings = checkBeforeCopy(
         markdown,
         body,
@@ -177,9 +186,16 @@ export function useDraftTransfer({
     setExporting(true)
     try {
       await ensureHighlighter()
+      const article = parseArticle(markdown)
       const { dataUrls } = await resolveImageDataUrls(markdown)
       const { body } = renderArticle(markdown, theme, dataUrls, density)
-      const blob = await renderLongImage({ body, theme, author: '稿域' })
+      const blob = await renderLongImage({
+        body,
+        theme,
+        author: article.author || '稿域',
+        title: article.title,
+        stripTitle: article.legacyTitle,
+      })
       const runtime = runtimeRef.current
       if (!runtime) return
       const saved = await runtime.exportFile(

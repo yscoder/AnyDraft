@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   Bold,
   Code,
@@ -17,7 +24,13 @@ import {
   Table,
   Undo2,
 } from 'lucide-react'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import {
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  keymap,
+  lineNumbers,
+} from '@codemirror/view'
 import { Compartment, EditorState } from '@codemirror/state'
 import {
   defaultKeymap,
@@ -43,6 +56,7 @@ const HEADING_ICON = {
 } as const
 
 interface Props {
+  articleHeader: ReactNode
   value: string
   onChange: (v: string) => void
   /** 保存一张图片到当前文档同级目录，返回最终文件名（失败返回 null） */
@@ -51,6 +65,7 @@ interface Props {
   imageNames: string[]
   /** 当前文档路径：切换文档时强制同步 doc */
   fileKey: string
+  lineOffset: number
   readOnly?: boolean
   /** 滚动同步通道：把编辑器顶部对应的源码位置发布给预览 */
   sync: ScrollSyncChannel
@@ -73,11 +88,13 @@ interface Props {
 
 const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   {
+    articleHeader,
     value,
     onChange,
     onAddImage,
     imageNames,
     fileKey,
+    lineOffset,
     readOnly = false,
     sync,
     collapsed,
@@ -95,6 +112,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
   onChangeRef.current = onChange
   const syncRef = useRef(sync)
   syncRef.current = sync
+  const lineOffsetRef = useRef(lineOffset)
+  lineOffsetRef.current = lineOffset
   // 补全候选走 ref：CodeMirror 扩展只在挂载时建一次，直接闭包会永远停在挂载时的空列表
   const imageNamesRef = useRef(imageNames)
   imageNamesRef.current = imageNames
@@ -142,6 +161,8 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             EditorView.editable.of(!readOnly),
           ]),
           lineNumbers(),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
           history(),
           keymap.of([
             ...defaultKeymap,
@@ -194,25 +215,24 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
               overflow: 'auto',
             },
             '.cm-content': {
-              padding: '20px 22px 20px 24px',
+              padding: '16px 0',
               caretColor: 'var(--foreground)',
             },
-            '.cm-line': { padding: '0' },
+            '.cm-line': { padding: '0 16px' },
             '.cm-gutters': {
               background: 'transparent',
               color: '#b0ab9f',
-              fontSize: '13.5px',
-              paddingLeft: '12px',
-              paddingRight: '14px',
+              fontSize: '12px',
               borderRight: 'none',
             },
-            '.cm-activeLineGutter': { background: 'transparent' },
+            '.cm-gutterElement': { fontFamily: 'var(--font-mono)' },
             '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
               background:
                 'color-mix(in oklch, var(--foreground) 14%, transparent)',
             },
             '&.cm-focused': { outline: 'none' },
-            '.cm-activeLine': { background: 'transparent' },
+            '.cm-activeLine': { background: 'var(--muted)' },
+            '.cm-activeLineGutter': { background: 'var(--muted)' },
           }),
           EditorView.updateListener.of((update) => {
             if (!update.docChanged) return
@@ -247,8 +267,9 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
       const position = positionAt(scroller.scrollTop)
       // 顺带上报「滚到底时的位置」，预览用它把文末当虚拟锚点
       syncRef.current.publish({
-        position,
-        endPosition: max > 0 ? positionAt(max) : position,
+        position: position + lineOffsetRef.current,
+        endPosition:
+          (max > 0 ? positionAt(max) : position) + lineOffsetRef.current,
         atTop,
         atBottom,
       })
@@ -627,6 +648,7 @@ const EditorPane = forwardRef<HTMLElement, Props>(function EditorPane(
             }, [])}
         </div>
       )}
+      {articleHeader}
       <div className="code-edit" ref={hostRef}></div>
       {outlineOpen && (
         <div className="outline-drawer">
