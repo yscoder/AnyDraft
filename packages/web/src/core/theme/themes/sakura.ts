@@ -11,7 +11,6 @@ export const sakuraTheme: Theme = {
     fontSize: '16px',
     lineHeight: '1.85',
     color: '#4a3f45',
-    bg: '#fffafc',
   },
   accent: '#d9628a',
   accentSoft: 'rgba(217,98,138,.10)',

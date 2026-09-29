@@ -23,6 +23,7 @@ function htmlToPlainText(html: string): string {
   doc.body.querySelectorAll('br').forEach((br) => br.replaceWith('\n'))
   doc.body.querySelectorAll(BLOCK_SELECTOR).forEach((el) => el.append('\n'))
   return (doc.body.textContent ?? '')
+    .replace(/\u00a0/g, ' ')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

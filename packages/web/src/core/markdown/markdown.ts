@@ -416,7 +416,8 @@ function splitCodeLines(html: string): string[] {
       flush()
       i++
     } else {
-      cur += ch
+      // 富文本编辑器粘贴时会折叠高亮 span 边界的普通空格。
+      cur += ch === ' ' ? '&nbsp;' : ch
       // 逐字符正则（/\s/）在长代码块上开销可观，这里直接比对空白字符
       if (ch !== ' ' && ch !== '\t' && ch !== '\r') hasText = true
       i++

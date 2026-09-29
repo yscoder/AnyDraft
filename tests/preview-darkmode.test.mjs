@@ -8,6 +8,7 @@ let server
 let dom
 let applyPreviewDarkmode
 let themes
+let getTheme
 let renderArticle
 before(async () => {
   dom = new JSDOM('<!doctype html><html><head></head><body></body></html>')
@@ -34,7 +35,9 @@ before(async () => {
     module.exports,
   )
   ;({ applyPreviewDarkmode } = module.exports)
-  ;({ themes } = await server.ssrLoadModule('/src/core/theme/theme.ts'))
+  ;({ themes, getTheme } = await server.ssrLoadModule(
+    '/src/core/theme/theme.ts',
+  ))
   ;({ renderArticle } = await server.ssrLoadModule(
     '/src/core/markdown/markdown.ts',
   ))
@@ -53,8 +56,21 @@ after(async () => {
     delete globalThis[key]
 })
 
-test('dark preview is reversible, scoped and stable across edits and all eight themes', () => {
-  assert.equal(themes.length, 8)
+test('dark preview is reversible, scoped and stable across edits and all six themes', () => {
+  assert.equal(themes.length, 6)
+  assert.deepEqual(
+    themes.map((theme) => theme.id),
+    ['classic', 'minimal', 'editorial', 'ink', 'sakura', 'indigo'],
+  )
+  assert.equal(themes.find((theme) => theme.id === 'sakura').body.bg, undefined)
+  assert.equal(getTheme('cream').id, 'classic')
+  assert.equal(getTheme('typewriter').id, 'classic')
+  assert.doesNotMatch(
+    renderArticle('正文', getTheme('sakura')).html.match(
+      /^<section style="([^"]*)">/,
+    )[1],
+    /background:/,
+  )
   assert.ok(
     themes.every(
       (theme) =>

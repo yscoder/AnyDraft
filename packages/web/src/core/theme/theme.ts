@@ -8,12 +8,10 @@
 import type { Theme } from './types'
 import { classicTheme } from './themes/classic'
 import { editorialTheme } from './themes/editorial'
-import { creamTheme } from './themes/cream'
 import { indigoTheme } from './themes/indigo'
 import { inkTheme } from './themes/ink'
 import { sakuraTheme } from './themes/sakura'
 import { minimalTheme } from './themes/minimal'
-import { typewriterTheme } from './themes/typewriter'
 
 export type { Theme } from './types'
 
@@ -22,9 +20,7 @@ export const themes: Theme[] = [
   minimalTheme,
   editorialTheme,
   inkTheme,
-  creamTheme,
   sakuraTheme,
-  typewriterTheme,
   indigoTheme,
 ]
 
