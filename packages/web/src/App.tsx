@@ -4,6 +4,7 @@ import RepositoryGate from '@/components/RepositoryGate'
 import WorkspaceContent from '@/components/WorkspaceContent'
 import WorkspaceSidebar from '@/components/WorkspaceSidebar'
 import SearchDialog from '@/features/search/SearchDialog'
+import ImageCleanupDialog from '@/features/image-cleanup/ImageCleanupDialog'
 import CopyCheckDialog from '@/features/transfer/CopyCheckDialog'
 import { findMatches, type SearchMatch } from '@/features/search/search'
 import { useDraftTransfer } from '@/features/transfer/useDraftTransfer'
@@ -102,6 +103,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'split' | 'preview'>('split')
   const isPreviewOnly = viewMode === 'preview'
   const [outlineOpen, setOutlineOpen] = useState(false)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
   const [isNarrow, setIsNarrow] = useState(
     () => window.matchMedia('(max-width: 900px)').matches,
   )
@@ -357,6 +359,7 @@ export default function App() {
         onDelete={handleDeleteNode}
         onChangeRoot={() => void handlePickRoot()}
         onRefresh={handleRefresh}
+        onCleanupImages={() => setCleanupOpen(true)}
         onLocateImage={handleLocateImage}
         onOpenTrashMarkdown={(id, path) => void openTrashMarkdown(id, path)}
         onRestoreTrash={handleRestoreTrash}
@@ -411,6 +414,18 @@ export default function App() {
           overlays={searchOverlays}
           onClose={() => setSearchOpen(false)}
           onSelect={openSearchResult}
+        />
+      )}
+      {cleanupOpen && repoRef.current && (
+        <ImageCleanupDialog
+          repo={repoRef.current}
+          overlays={searchOverlays}
+          onClose={() => setCleanupOpen(false)}
+          onMoved={async () => {
+            await runMutation(async () => {
+              await refreshRepo()
+            })
+          }}
         />
       )}
       <ConfirmationDialog

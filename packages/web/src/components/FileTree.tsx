@@ -56,6 +56,7 @@ interface Props {
   onDelete: (path: string) => void
   onChangeRoot: () => void
   onSearch: () => void
+  onCleanupImages: () => void
   onRefresh: () => void
   onLocateImage: (name: string) => void
   onOpenTrashMarkdown: (id: string, relativePath: string) => void
@@ -115,6 +116,7 @@ export default function FileTree({
   onChangeRoot,
   onRefresh,
   onSearch,
+  onCleanupImages,
   onLocateImage,
   onOpenTrashMarkdown,
   onRestoreTrash,
@@ -238,6 +240,11 @@ export default function FileTree({
                 >
                   <FolderPlus size={14} /> 新建文件夹
                 </DropdownMenuItem>
+                {isRoot && (
+                  <DropdownMenuItem onSelect={onCleanupImages}>
+                    <Trash2 size={14} /> 清理未引用图片
+                  </DropdownMenuItem>
+                )}
               </>
             )}
             {showNewActions && canDelete && <DropdownMenuSeparator />}

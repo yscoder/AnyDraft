@@ -74,3 +74,35 @@ export function findReferencedImages(
 
   return [...picked].map(([name, node]) => ({ name, node }))
 }
+
+/** 清理扫描按完整路径计数；全局同名回退有歧义时保留所有可能的图片。 */
+export function referencedImagePaths(
+  markdownPath: string,
+  markdown: string,
+  nodes: RepoNode[],
+): Set<string> {
+  const byPath = new Map(
+    nodes
+      .filter((node) => node.kind === 'image')
+      .map((node) => [node.path, node]),
+  )
+  const byName = new Map<string, string[]>()
+  for (const path of byPath.keys()) {
+    const name = baseNamePath(path)
+    byName.set(name, [...(byName.get(name) ?? []), path])
+  }
+  const paths = new Set<string>()
+  const currentDir = dirnamePath(markdownPath)
+  for (const rawRef of collectImageSources(markdown)) {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(rawRef)) continue
+    const ref = decodeImageRef(rawRef)
+    const name = baseNamePath(ref)
+    if (!name) continue
+    const exact = resolveRelativePath(currentDir, ref)
+    const local = joinPath(currentDir, name)
+    if (exact && byPath.has(exact)) paths.add(exact)
+    else if (byPath.has(local)) paths.add(local)
+    else for (const path of byName.get(name) ?? []) paths.add(path)
+  }
+  return paths
+}
