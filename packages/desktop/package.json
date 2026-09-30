@@ -1,7 +1,7 @@
 {
   "name": "@any-draft/desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "稿域桌面端（Tauri 2）运行时与原生文件系统适配器",
   "main": "./src/index.ts",

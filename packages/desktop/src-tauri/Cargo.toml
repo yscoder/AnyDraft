@@ -1,6 +1,6 @@
 [package]
 name = "AnyDraft"
-version = "0.1.0"
+version = "0.2.0"
 description = "稿域桌面客户端"
 authors = ["yusen <634206017@qq.com>"]
 edition = "2024"
