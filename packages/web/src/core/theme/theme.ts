@@ -13,6 +13,27 @@ import { inkTheme } from './themes/ink'
 import { sakuraTheme } from './themes/sakura'
 import { minimalTheme } from './themes/minimal'
 
+import { githubTheme } from './themes/github'
+import { smartblueTheme } from './themes/smartblue'
+import { cyanosisTheme } from './themes/cyanosis'
+import { channingCyanTheme } from './themes/channing-cyan'
+import { fancyTheme } from './themes/fancy'
+import { hydrogenTheme } from './themes/hydrogen'
+import { greenwillowTheme } from './themes/greenwillow'
+import { vGreenTheme } from './themes/v-green'
+import { healerReadableTheme } from './themes/healer-readable'
+import { jzmanTheme } from './themes/jzman'
+import { geekBlackTheme } from './themes/geek-black'
+import { orangeTheme } from './themes/orange'
+import { scrollsLightTheme } from './themes/scrolls-light'
+import { arknightsTheme } from './themes/arknights'
+import { vuepressTheme } from './themes/vuepress'
+import { ChineseRedTheme } from './themes/Chinese-red'
+import { devuiBlueTheme } from './themes/devui-blue'
+import { sereneRoseTheme } from './themes/serene-rose'
+import { zBlueTheme } from './themes/z-blue'
+import { lilsnakeTheme } from './themes/lilsnake'
+
 export type { Theme } from './types'
 
 export const themes: Theme[] = [
@@ -22,6 +43,26 @@ export const themes: Theme[] = [
   inkTheme,
   sakuraTheme,
   indigoTheme,
+  githubTheme,
+  smartblueTheme,
+  cyanosisTheme,
+  channingCyanTheme,
+  fancyTheme,
+  hydrogenTheme,
+  greenwillowTheme,
+  vGreenTheme,
+  healerReadableTheme,
+  jzmanTheme,
+  geekBlackTheme,
+  orangeTheme,
+  scrollsLightTheme,
+  arknightsTheme,
+  vuepressTheme,
+  ChineseRedTheme,
+  devuiBlueTheme,
+  sereneRoseTheme,
+  zBlueTheme,
+  lilsnakeTheme,
 ]
 
 /** 按 id 取主题，找不到回退经典 */

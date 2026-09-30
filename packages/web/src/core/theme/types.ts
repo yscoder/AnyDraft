@@ -24,8 +24,16 @@ export interface Theme {
     letterSpacing?: string
     marginTop: string
     marginBottom: string
-    /** 标题装饰：accent-bar 顶部强调条 / underline 下划线 / band 色带 / rule 杂志粗规则线 / none */
-    decor?: 'none' | 'underline' | 'band' | 'accent-bar' | 'rule'
+    textAlign?: string
+    /** 标题装饰：accent-bar 顶部强调条 / underline 下划线 / band 背景色 / rule 粗规则线 / symbol 前置 # / left-bar 左侧竖条 / none */
+    decor?:
+      | 'none'
+      | 'underline'
+      | 'band'
+      | 'accent-bar'
+      | 'rule'
+      | 'symbol'
+      | 'left-bar'
   }
   headingSizes: {
     h1: string

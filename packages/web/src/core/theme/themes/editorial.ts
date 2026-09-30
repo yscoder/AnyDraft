@@ -1,4 +1,4 @@
-import { SANS } from '../fonts'
+import { SANS, SERIF } from '../fonts'
 import type { Theme } from '../types'
 
 /** 杂志编辑：绯红强调 + 重磅衬线大标题 + 报刊引语，纸媒编辑部气质 */
@@ -10,7 +10,7 @@ export const editorialTheme: Theme = {
   accent: '#c43a2d',
   accentSoft: 'rgba(196,58,45,.09)',
   heading: {
-    font: "Georgia, 'Songti SC', 'STSong', serif",
+    font: SERIF,
     fontWeight: '800',
     color: '#14120e',
     lineHeight: '1.22',
@@ -37,7 +37,7 @@ export const editorialTheme: Theme = {
     margin: '26px 0',
     fontStyle: 'italic',
     extra: {
-      'font-family': "Georgia, 'Songti SC', serif",
+      'font-family': SERIF,
       'font-size': '18px',
       'line-height': '1.8',
     },

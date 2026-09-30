@@ -56,12 +56,12 @@ after(async () => {
     delete globalThis[key]
 })
 
-test('dark preview is reversible, scoped and stable across edits and all six themes', () => {
-  assert.equal(themes.length, 6)
+test('dark preview is reversible, scoped and stable across edits and all themes', () => {
   assert.deepEqual(
-    themes.map((theme) => theme.id),
+    themes.slice(0, 6).map((theme) => theme.id),
     ['classic', 'minimal', 'editorial', 'ink', 'sakura', 'indigo'],
   )
+  assert.equal(new Set(themes.map((theme) => theme.id)).size, themes.length)
   assert.equal(themes.find((theme) => theme.id === 'sakura').body.bg, undefined)
   assert.equal(getTheme('cream').id, 'classic')
   assert.equal(getTheme('typewriter').id, 'classic')

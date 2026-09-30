@@ -190,6 +190,7 @@ md.renderer.rules.heading_open = ((tokens, idx, _o, env) => {
   }
   if (th.heading.letterSpacing)
     styles['letter-spacing'] = th.heading.letterSpacing
+  if (th.heading.textAlign) styles['text-align'] = th.heading.textAlign
   const decor = th.heading.decor ?? 'none'
   if (decor === 'accent-bar' && idx > 0) {
     styles['border-top'] = `3px solid ${th.accent}`
@@ -206,10 +207,17 @@ md.renderer.rules.heading_open = ((tokens, idx, _o, env) => {
     styles['background'] = th.accentSoft ?? 'rgba(217,119,87,.12)'
     styles['padding'] = '4px 10px'
     styles['border-radius'] = '6px'
+  } else if (decor === 'left-bar') {
+    styles['border-left'] = `6px solid ${th.accent}`
+    styles['padding-left'] = '12px'
   }
   // 源码行号锚点（预览同步滚动用；map 是 0-based，CodeMirror 行号 1-based，+1 对齐）
   const line = tokens[idx].map?.[0]
-  return `<${tag}${line != null ? ` data-line="${line}"` : ''} style="${st(styles)}">`
+  const symbol =
+    decor === 'symbol'
+      ? `<span data-heading-decor="symbol" aria-hidden="true" style="${st({ color: th.accent, 'margin-right': '8px' })}">#</span>`
+      : ''
+  return `<${tag}${line != null ? ` data-line="${line}"` : ''} style="${st(styles)}">${symbol}`
 }) as RenderRule
 
 md.renderer.rules.paragraph_open = ((tokens, idx, _o, env) => {
@@ -884,6 +892,7 @@ export function extractTitle(body: string): string {
   const m = body.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
   if (!m) return ''
   return m[1]
+    .replace(/<span data-heading-decor="symbol"[^>]*>[\s\S]*?<\/span>/g, '')
     .replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

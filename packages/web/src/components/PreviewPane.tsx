@@ -320,10 +320,6 @@ export default function PreviewPane({
   // Follow the article theme in the status bar and desktop window chrome
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--art-accent', theme.accent)
-    document.documentElement.style.setProperty(
-      '--art-heading',
-      theme.heading.color,
-    )
     document.documentElement.style.setProperty('--art-ink', theme.body.color)
     document.documentElement.style.setProperty('--art-hr', theme.hr.color)
     document.documentElement.style.setProperty(
@@ -340,7 +336,6 @@ export default function PreviewPane({
     )
     return () => {
       document.documentElement.style.removeProperty('--art-accent')
-      document.documentElement.style.removeProperty('--art-heading')
       document.documentElement.style.removeProperty('--art-ink')
       document.documentElement.style.removeProperty('--art-hr')
       document.documentElement.style.removeProperty('--art-foot-text')

@@ -65,7 +65,11 @@ export default function ThemeControls({
             </Button>
           </DropdownMenuTrigger>
         </TooltipHint>
-        <DropdownMenuContent align="end" side="top" className="min-w-36">
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          className="min-w-36 max-h-[min(70vh,28rem)] overflow-y-auto"
+        >
           <DropdownMenuRadioGroup
             value={activeTheme.id}
             onValueChange={onThemeChange}
